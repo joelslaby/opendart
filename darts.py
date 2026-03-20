@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import tkinter as tk
 from PIL import Image, ImageTk
 import json
@@ -8,14 +9,11 @@ import os
 # Constants
 # -------------------------
 
-CRICKET_NUMBERS = [20, 19, 18, 17, 16, 15, "BULL"]
-CRICKET_DISPLAY = [20,19,18,17,16,15,"BULL"]
-
-SAVE_FILE = "darts_save.json"
-
 # order clockwise starting from top
 BOARD_ORDER = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17,
                3, 19, 7, 16, 8, 11, 14, 9, 12, 5]
+CRICKET_NUMBERS = [20,19,18,17,16,15,"BULL"]
+SAVE_FILE = "darts_save.json"
 
 def cricket_marks(hits):
 
@@ -36,34 +34,33 @@ def cricket_marks(hits):
     return "Ⓧ " + "|" * extra
 
 # -------------------------
+# Hit class
+# -------------------------
+@dataclass
+class Hit:
+    zone: int
+    multiplier: int = 1
+    location: tuple = None
+
+# -------------------------
 # Player class
 # -------------------------
 
 class Player:
-
     def __init__(self, name):
         self.name = name
-        self.hits = {n: 0 for n in CRICKET_NUMBERS}
-        self.score = 0
+        self.hit_history:list[Hit] = []
+        self.points_for = 0
         self.darts_thrown = 0
 
-    def add_hit(self, number, multiplier):
-
+    def add_hit(self, hit: Hit):
         self.darts_thrown += 1
+        self.hit_history.append(hit)
 
-        if number not in CRICKET_NUMBERS:
+        if hit.zone not in CRICKET_NUMBERS:
             return 0
-
-        gained_points = 0
-
-        for _ in range(multiplier):
-
-            if self.hits[number] < 3:
-                self.hits[number] += 1
-            else:
-                gained_points += number if number != "BULL" else 25
-
-        return gained_points
+        else:
+            return hit.zone
 
 
 # -------------------------
@@ -71,15 +68,34 @@ class Player:
 # -------------------------
 
 class Team:
-
     def __init__(self, name, p1, p2):
-
         self.name = name
         self.players = [Player(p1), Player(p2)]
+        self.cricket_display = {num: 0 for num in CRICKET_NUMBERS}
+        self.cricket_tallies = {num: 0 for num in CRICKET_NUMBERS}
+        self.cricket_closed = {num: False for num in CRICKET_NUMBERS}
         self.score = 0
 
     def has_closed(self, number):
-        return all(p.hits[number] >= 3 for p in self.players)
+        if sum(p.hits[number] for p in self.players) >= 3:
+            self.cricket_closed[number] = True
+        return self.cricket_closed[number]
+    
+    def add_hit(self, player: Player, hit: Hit):
+        
+        player.add_hit(hit)
+        if player.add_hit(hit):
+            hits_over = max(0, hit.multiplier - 3 + self.cricket_display[hit.zone])
+
+            if not self.cricket_closed[hit.zone]:
+                self.cricket_display[hit.zone] += hit.multiplier
+                if self.cricket_display[hit.zone] >= 3:
+                    self.cricket_display[hit.zone] = 3
+                    self.cricket_closed[hit.zone] = True
+            
+            return hits_over
+        else:
+            return 0
 
 
 # -------------------------
@@ -91,10 +107,11 @@ class CricketGame:
     def __init__(self):
 
         self.teams = [
-            Team("Team A", "Player A1", "Player A2"),
-            Team("Team B", "Player B1", "Player B2")
+            Team("Team A", "Adam", "Charles"),
+            Team("Team B", "Ben", "David")
         ]
 
+        self.next_player = 0
         self.current_team = 0
         self.current_player = 0
         self.darts_in_turn = 0
@@ -108,23 +125,24 @@ class CricketGame:
     def next_turn(self):
 
         self.darts_in_turn = 0
+        self.next_player += 1
+        self.next_player %= 4
 
-        if self.current_player == 0:
-            self.current_player = 1
-        else:
-            self.current_player = 0
-            self.current_team = 1 - self.current_team
+        self.current_team = self.next_player % 2
+        self.current_player = self.next_player // 2
 
-    def register_hit(self, number, mult):
+
+    def register_hit(self, hit: Hit):
 
         player = self.active_player()
         team = self.teams[self.current_team]
         opponent = self.opponent_team()
 
-        gained = player.add_hit(number, mult)
+        hits_over = team.add_hit(player, hit)
 
-        if gained > 0 and not opponent.has_closed(number):
-            team.score += gained
+        if hits_over and not opponent.cricket_closed[hit.zone]:
+            team.cricket_tallies[hit.zone] += hits_over
+            team.score += hits_over * hit.zone
 
         self.darts_in_turn += 1
 
@@ -132,58 +150,60 @@ class CricketGame:
             self.next_turn()
 
     def save(self):
+        pass
+        # data = {
+        #     "teams": [],
+        #     "current_team": self.current_team,
+        #     "current_player": self.current_player,
+        #     "darts_in_turn": self.darts_in_turn
+        # }
 
-        data = {
-            "teams": [],
-            "current_team": self.current_team,
-            "current_player": self.current_player,
-            "darts_in_turn": self.darts_in_turn
-        }
+        # for team in self.teams:
 
-        for team in self.teams:
+        #     t = {
+        #         "name": team.name,
+        #         "score": team.score,
+        #         "players": []
+        #     }
 
-            t = {
-                "name": team.name,
-                "score": team.score,
-                "players": []
-            }
+        #     for p in team.players:
+        #         t["players"].append({
+        #             "name": p.name,
+        #             "hits": p.hits,
+        #             "score": p.score,
+        #             "darts": p.darts_thrown
+        #         })
 
-            for p in team.players:
-                t["players"].append({
-                    "name": p.name,
-                    "hits": p.hits,
-                    "score": p.score,
-                    "darts": p.darts_thrown
-                })
-
-            data["teams"].append(t)
+        #     data["teams"].append(t)
 
         with open(SAVE_FILE, "w") as f:
-            json.dump(data, f)
+            # json.dump(data, f)
+            pass
 
     def load(self):
+        pass
 
-        if not os.path.exists(SAVE_FILE):
-            return
+        # if not os.path.exists(SAVE_FILE):
+        #     return
 
-        with open(SAVE_FILE) as f:
-            data = json.load(f)
+        # with open(SAVE_FILE) as f:
+        #     data = json.load(f)
 
-        self.current_team = data["current_team"]
-        self.current_player = data["current_player"]
-        self.darts_in_turn = data["darts_in_turn"]
+        # self.current_team = data["current_team"]
+        # self.current_player = data["current_player"]
+        # self.darts_in_turn = data["darts_in_turn"]
 
-        for t_i, tdata in enumerate(data["teams"]):
+        # for t_i, tdata in enumerate(data["teams"]):
 
-            team = self.teams[t_i]
-            team.score = tdata["score"]
+        #     team = self.teams[t_i]
+        #     team.score = tdata["score"]
 
-            for p_i, pdata in enumerate(tdata["players"]):
+        #     for p_i, pdata in enumerate(tdata["players"]):
 
-                p = team.players[p_i]
-                p.hits = pdata["hits"]
-                p.score = pdata["score"]
-                p.darts_thrown = pdata["darts"]
+        #         p = team.players[p_i]
+        #         p.hits = pdata["hits"]
+        #         p.score = pdata["score"]
+        #         p.darts_thrown = pdata["darts"]
 
 
 # -------------------------
@@ -297,10 +317,6 @@ class DartsApp:
 
     def click(self,event):
 
-        cx = self.size/2
-        cy = self.size/2
-        r = self.size/2
-
         number, mult = interpret_click(event.x,event.y)
 
         self.score_label.config(text=f"dart score: {number}, {mult}")
@@ -329,7 +345,7 @@ class DartsApp:
             "multiplier": mult
         })
 
-        self.game.register_hit(number,mult)
+        self.game.register_hit(Hit(number,mult, (event.x, event.y)))
 
         # reset board after 3 darts
         if self.game.darts_in_turn == 0:
@@ -362,28 +378,30 @@ class DartsApp:
         self.dart_markers = []
 
     def save(self):
+        pass
 
-        self.game.save()
+        # self.game.save()
 
-        data = {
-            "dart_history": self.dart_history
-        }
+        # data = {
+        #     "dart_history": self.dart_history
+        # }
 
-        with open("dart_history.json","w") as f:
-            json.dump(data,f,indent=2)
+        # with open("dart_history.json","w") as f:
+        #     json.dump(data,f,indent=2)
 
     def load(self):
+        pass
 
-        self.game.load()
+        # self.game.load()
 
-        if os.path.exists("dart_history.json"):
+        # if os.path.exists("dart_history.json"):
 
-            with open("dart_history.json") as f:
-                data = json.load(f)
+        #     with open("dart_history.json") as f:
+        #         data = json.load(f)
 
-            self.dart_history = data["dart_history"]
+        #     self.dart_history = data["dart_history"]
 
-        self.update_label()
+        # self.update_label()
 
     def undo(self):
         pass
@@ -397,11 +415,9 @@ class DartsApp:
         start_x = 120
         start_y = 40
 
-        numbers = [20,19,18,17,16,15,"BULL"]
-
         # Header row (numbers)
 
-        for i,num in enumerate(numbers):
+        for i,num in enumerate(CRICKET_NUMBERS):
 
             x = start_x + i*col_width
 
@@ -419,9 +435,12 @@ class DartsApp:
 
         # Team A marks
 
-        for i,num in enumerate(numbers):
+        for i,num in enumerate(CRICKET_NUMBERS):
 
-            hits = max(p.hits[num] for p in self.game.teams[0].players)
+            hits = self.game.teams[0].cricket_display[num] + self.game.teams[0].cricket_tallies[num]
+
+            # hits = max(p.hits[num] for p in self.game.teams[0].players)
+            # hits = self.team.cricket_display[num]
 
             x = start_x + i*col_width
 
@@ -434,9 +453,9 @@ class DartsApp:
 
         # Team B marks
 
-        for i,num in enumerate(numbers):
+        for i,num in enumerate(CRICKET_NUMBERS):
 
-            hits = max(p.hits[num] for p in self.game.teams[1].players)
+            hits = self.game.teams[1].cricket_display[num] + self.game.teams[1].cricket_tallies[num]
 
             x = start_x + i*col_width
 
@@ -449,7 +468,7 @@ class DartsApp:
 
         # Score column
 
-        score_x = start_x + len(numbers)*col_width + 20
+        score_x = start_x + len(CRICKET_NUMBERS)*col_width + 20
 
         c.create_text(score_x,start_y,text="Score",font=("Arial",14,"bold"))
 
