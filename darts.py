@@ -12,7 +12,7 @@ import os
 # order clockwise starting from top
 BOARD_ORDER = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17,
                3, 19, 7, 16, 8, 11, 14, 9, 12, 5]
-CRICKET_NUMBERS = [20,19,18,17,16,15,"BULL"]
+CRICKET_NUMBERS = [20,19,18,17,16,15,25]
 SAVE_FILE = "darts_save.json"
 
 def cricket_marks(hits):
@@ -237,21 +237,26 @@ def interpret_click(x, y):
     # each wedge = 18 degrees
     index = int(angle / 18)
 
-    board_numbers = [
-        20,1,18,4,13,6,10,15,2,17,
-        3,19,7,16,8,11,14,9,12,5
-    ]
-
-    if 203 <= dist <= 225:
-        mult = 2
-
-    elif 127 <= dist <= 150:
-        mult = 3
-
+    if dist <= 309-300:
+        return 25, 2
+    elif dist <= 320-300:
+        return 25, 1
     else:
-        mult = 1
+        board_numbers = [
+            20,1,18,4,13,6,10,15,2,17,
+            3,19,7,16,8,11,14,9,12,5
+        ]
 
-    return board_numbers[index], mult
+        if 203 <= dist <= 225:
+            mult = 2
+
+        elif 127 <= dist <= 150:
+            mult = 3
+
+        else:
+            mult = 1
+
+        return board_numbers[index], mult
 
 
 # -------------------------
@@ -424,7 +429,7 @@ class DartsApp:
             c.create_text(
                 x,
                 start_y,
-                text=str(num),
+                text="Bull" if num == 25 else str(num),
                 font=("Arial",14,"bold")
             )
 
