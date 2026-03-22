@@ -13,26 +13,8 @@ import os
 # order clockwise starting from top
 BOARD_ORDER = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17,
                3, 19, 7, 16, 8, 11, 14, 9, 12, 5]
-CRICKET_NUMBERS = [20,19,18,17,16,15,25]
+DOUBLE_OUT_NUMBERS = [2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,50]
 SAVE_FILE = "darts_save.json"
-
-def cricket_marks(hits):
-
-    if hits == 0:
-        return ""
-
-    if hits == 1:
-        return "/"
-
-    if hits == 2:
-        return "X"
-
-    if hits == 3:
-        return "Ⓧ"
-
-    # extra hits
-    extra = hits - 3
-    return "Ⓧ " + "|" * extra
 
 # -------------------------
 # Hit class
@@ -57,11 +39,7 @@ class Player:
     def add_hit(self, hit: Hit):
         self.darts_thrown += 1
         self.hit_history.append(hit)
-
-        if hit.zone not in CRICKET_NUMBERS:
-            return 0
-        else:
-            return hit.zone
+        hit.zone
 
 
 # -------------------------
@@ -72,38 +50,17 @@ class Team:
     def __init__(self, name, p1, p2):
         self.name = name
         self.players = [Player(p1), Player(p2)]
-        self.cricket_display = {num: 0 for num in CRICKET_NUMBERS}
-        self.cricket_tallies = {num: 0 for num in CRICKET_NUMBERS}
-        self.cricket_closed = {num: False for num in CRICKET_NUMBERS}
-        self.score = 0
-
-    def has_closed(self, number):
-        if sum(p.hits[number] for p in self.players) >= 3:
-            self.cricket_closed[number] = True
-        return self.cricket_closed[number]
+        self.score = 501
     
     def add_hit(self, player: Player, hit: Hit):
-        
         player.add_hit(hit)
-        if player.add_hit(hit):
-            hits_over = max(0, hit.multiplier - 3 + self.cricket_display[hit.zone])
-
-            if not self.cricket_closed[hit.zone]:
-                self.cricket_display[hit.zone] += hit.multiplier
-                if self.cricket_display[hit.zone] >= 3:
-                    self.cricket_display[hit.zone] = 3
-                    self.cricket_closed[hit.zone] = True
-            
-            return hits_over
-        else:
-            return 0
 
 
 # -------------------------
 # Game State
 # -------------------------
 
-class CricketGame:
+class X01Game:
 
     def __init__(self):
 
@@ -137,17 +94,19 @@ class CricketGame:
 
         player = self.active_player()
         team = self.teams[self.current_team]
-        opponent = self.opponent_team()
 
-        hits_over = team.add_hit(player, hit)
+        team.add_hit(player, hit)
 
-        if hits_over and not opponent.cricket_closed[hit.zone]:
-            team.cricket_tallies[hit.zone] += hits_over
-            team.score += hits_over * hit.zone
+        team.score -= hit.multiplier * hit.zone
 
         self.darts_in_turn += 1
 
-        if self.darts_in_turn == 3:
+        if team.score == 0 and hit.multiplier == 2:
+            print(f"{team.name} wins!")
+        elif team.score <= 0:
+            team.score += hit.multiplier * hit.zone
+            self.next_turn()
+        elif self.darts_in_turn == 3:
             self.next_turn()
 
 
@@ -159,41 +118,7 @@ class CricketGame:
         self.darts_in_turn = 0
 
         for team in self.teams:
-            team.cricket_display = {num: 0 for num in CRICKET_NUMBERS}
-            team.cricket_tallies = {num: 0 for num in CRICKET_NUMBERS}
-            team.cricket_closed = {num: False for num in CRICKET_NUMBERS}
             team.score = 0
-
-    def save(self):
-        pass
-        # data = {
-        #     "teams": [],
-        #     "current_team": self.current_team,
-        #     "current_player": self.current_player,
-        #     "darts_in_turn": self.darts_in_turn
-        # }
-
-        # for team in self.teams:
-
-        #     t = {
-        #         "name": team.name,
-        #         "score": team.score,
-        #         "players": []
-        #     }
-
-        #     for p in team.players:
-        #         t["players"].append({
-        #             "name": p.name,
-        #             "hits": p.hits,
-        #             "score": p.score,
-        #             "darts": p.darts_thrown
-        #         })
-
-        #     data["teams"].append(t)
-
-        with open(SAVE_FILE, "w") as f:
-            # json.dump(data, f)
-            pass
 
 # -------------------------
 # Dartboard math
@@ -257,9 +182,9 @@ class DartsApp:
     def __init__(self, root):
 
         self.root = root
-        root.title("Cricket Darts")
+        root.title("501 Darts")
 
-        self.game = CricketGame()
+        self.game = X01Game()
 
         img = Image.open("dartboard.png")
         self.size = 600
@@ -390,7 +315,7 @@ class DartsApp:
 
         self.label.config(text=text)
 
-        self.draw_scoreboard()
+        self.draw_X01_scoreboard()
 
     def clear_team_darts(self):
         
@@ -423,8 +348,6 @@ class DartsApp:
     # Check if the user cancelled the dialog
         if not file_path:
             return
-
-        self.game.save()
 
         data = {
             "dart_history": self.dart_history
@@ -507,69 +430,18 @@ class DartsApp:
         self.game.teams[1].players[0], self.game.teams[1].players[1] = self.game.teams[1].players[1], self.game.teams[1].players[0]
         self.update_label()
 
-    def draw_scoreboard(self):
+    def draw_X01_scoreboard(self):
 
         c = self.score_canvas
         c.delete("all")
 
         col_width = 60
-        start_x = 120
+        start_x = 60
         start_y = 40
-
-        # Header row (numbers)
-
-        for i,num in enumerate(CRICKET_NUMBERS):
-
-            x = start_x + i*col_width
-
-            c.create_text(
-                x,
-                start_y,
-                text="Bull" if num == 25 else str(num),
-                font=("Arial",14,"bold")
-            )
-
-        # Team labels
-
-        c.create_text(50,80,text="Team A",font=("Arial",14,"bold"))
-        c.create_text(50,130,text="Team B",font=("Arial",14,"bold"))
-
-        # Team A marks
-
-        for i,num in enumerate(CRICKET_NUMBERS):
-
-            hits = self.game.teams[0].cricket_display[num] + self.game.teams[0].cricket_tallies[num]
-
-            # hits = max(p.hits[num] for p in self.game.teams[0].players)
-            # hits = self.team.cricket_display[num]
-
-            x = start_x + i*col_width
-
-            c.create_text(
-                x,
-                80,
-                text=cricket_marks(hits),
-                font=("Arial",16)
-            )
-
-        # Team B marks
-
-        for i,num in enumerate(CRICKET_NUMBERS):
-
-            hits = self.game.teams[1].cricket_display[num] + self.game.teams[1].cricket_tallies[num]
-
-            x = start_x + i*col_width
-
-            c.create_text(
-                x,
-                130,
-                text=cricket_marks(hits),
-                font=("Arial",16)
-            )
 
         # Score column
 
-        score_x = start_x + len(CRICKET_NUMBERS)*col_width + 20
+        score_x = start_x
 
         c.create_text(score_x,start_y,text="Score",font=("Arial",14,"bold"))
 
@@ -577,16 +449,85 @@ class DartsApp:
             score_x,
             80,
             text=str(self.game.teams[0].score),
-            font=("Arial",16,"bold")
+            font=("Arial",20,"bold")
         )
 
         c.create_text(
             score_x,
             130,
             text=str(self.game.teams[1].score),
-            font=("Arial",16,"bold")
+            font=("Arial",20,"bold")
         )
 
+        # History columns
+        hist_x = start_x + 60
+        x_gap = 60
+
+        c.create_text(
+            hist_x + 5/2*x_gap,
+            20,
+            text="Previous Throws",
+            font=("Arial",14,"bold")
+        )
+
+        hist_length = len(self.dart_history)
+        num_history = math.ceil(hist_length/6)
+        for ii in range(6):
+            c.create_text(hist_x + x_gap * ii,start_y,text=str(ii),font=("Arial",14,"bold"))
+            if ii < num_history:
+                score_0 = 0
+                score_1 = 0 
+                if ii == 0:
+                    set_idxs = hist_length - num_history*6 + 6
+                    for nn in range(set_idxs):
+                        if self.dart_history[-nn]["team"] == 0:
+                            score_0 += self.dart_history[-nn]["number"] * self.dart_history[-nn]["multiplier"]
+                        else:
+                            score_1 += self.dart_history[-nn]["number"] * self.dart_history[-nn]["multiplier"]
+                else:
+                    for nn in range(6):
+                        if self.dart_history[-set_idxs-nn]["team"] == 0:
+                            score_0 += self.dart_history[-set_idxs-nn]["number"] * self.dart_history[-set_idxs-nn]["multiplier"]
+                        else:
+                            score_1 += self.dart_history[-set_idxs-nn]["number"] * self.dart_history[-set_idxs-nn]["multiplier"]
+                for team in range(2):
+                    c.create_text(
+                        hist_x + x_gap * ii,
+                        80 + team*50,
+                        text=f"{score_0 if team == 0 else score_1}",
+                        font=("Arial",16)
+                    )
+
+        # Double out column
+        do_x = start_x + 460
+        
+        c.create_text(do_x,start_y,text="Double Out",font=("Arial",14,"bold"))
+
+        for team in range(2):
+            if self.game.teams[team].score in DOUBLE_OUT_NUMBERS:
+                if self.game.teams[team].name == "930":
+                    c.create_text(
+                        do_x,
+                        80 + team*50,
+                        text="Miss!",
+                        font=("Arial",20,"bold")
+                    )
+                else:
+                    c.create_text(
+                        do_x,
+                            80 + team*50,
+                            text=str(int(self.game.teams[team].score/2)),
+                        font=("Arial",20,"bold")
+                    )
+            else:
+                c.create_text(
+                    do_x,
+                    80 + team*50,
+                    text="NO",
+                    font=("Arial",20,"bold")
+                )
+            
+            
 
 # -------------------------
 # Run
