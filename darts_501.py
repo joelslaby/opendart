@@ -118,7 +118,7 @@ class X01Game:
         self.darts_in_turn = 0
 
         for team in self.teams:
-            team.score = 0
+            team.score = 501
 
 # -------------------------
 # Dartboard math
@@ -254,14 +254,14 @@ class DartsApp:
             dot = self.canvas.create_oval(
                 event.x-5, event.y-5,
                 event.x+5, event.y+5,
-                fill="cyan", outline=""
+                fill="dodgerblue", outline=""
             )
             self.dart_markers_0.append(dot)
         else:
             dot = self.canvas.create_oval(
                 event.x-5, event.y-5,
                 event.x+5, event.y+5,
-                fill="purple", outline=""
+                fill="blueviolet", outline=""
             )
             self.dart_markers_1.append(dot)
 
@@ -394,14 +394,14 @@ class DartsApp:
                 dot = self.canvas.create_oval(
                     hit["x"]-5, hit["y"]-5,
                     hit["x"]+5, hit["y"]+5,
-                    fill="cyan", outline=""
+                    fill="dodgerblue", outline=""
                 )
                 self.dart_markers_0.append(dot)
             else:
                 dot = self.canvas.create_oval(
                     hit["x"]-5, hit["y"]-5,
                     hit["x"]+5, hit["y"]+5,
-                    fill="purple", outline=""
+                    fill="blueviolet", outline=""
                 )
                 self.dart_markers_1.append(dot)
             self.game.register_hit(Hit(hit["number"], hit["multiplier"], (hit["x"], hit["y"])))
@@ -473,10 +473,10 @@ class DartsApp:
         hist_length = len(self.dart_history)
         num_history = math.ceil(hist_length/6)
         for ii in range(6):
+            score_0 = 0
+            score_1 = 0 
             c.create_text(hist_x + x_gap * ii,start_y,text=str(ii),font=("Arial",14,"bold"))
             if ii < num_history:
-                score_0 = 0
-                score_1 = 0 
                 if ii == 0:
                     set_idxs = hist_length - num_history*6 + 6
                     for nn in range(set_idxs):
