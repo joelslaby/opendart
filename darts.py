@@ -562,7 +562,7 @@ class DartsApp:
         if next_player_flag:
             c.create_text(
                 10,
-                150,
+                140,
                 anchor="w",
                 text=f"Next player: {player_list[0].name}",
                 font=("Arial",30,"bold"),
@@ -570,7 +570,7 @@ class DartsApp:
             )
             c.create_text(
                 panel_width*2 - 10,
-                150,
+                140,
                 anchor="e",
                 text=f"{next_team}",
                 font=("Arial",30,"bold"),
@@ -578,7 +578,7 @@ class DartsApp:
             )
             c.create_text(
                 10,
-                150,
+                140,
                 anchor="w",
                 text=f"Next player:",
                 font=("Arial",30,"bold"),
