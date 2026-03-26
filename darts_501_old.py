@@ -103,12 +103,11 @@ class X01Game:
 
         if team.score == 0 and hit.multiplier == 2:
             print(f"{team.name} wins!")
-        elif team.score <= 0:
+        elif team.score <= 0: # bust
             team.score += hit.multiplier * hit.zone
             self.next_turn()
         elif self.darts_in_turn == 3:
             self.next_turn()
-
 
     def reset(self):
 
