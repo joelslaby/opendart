@@ -395,9 +395,9 @@ class DartsApp:
         c.delete("all")
 
         width = 600
-        panel_height = 174
+        panel_height = 162
         panel_width = int((width)/3)
-        pfp_size = 100
+        pfp_size = 98
         box_height = 40
 
         # Make lines to seperate panels
