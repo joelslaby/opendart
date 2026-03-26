@@ -51,3 +51,16 @@ def interpret_click(x, y):
             mult = 1
 
         return board_numbers[index], mult
+    
+
+# -------------------------
+# Dart history changes
+# -------------------------
+
+def swap_players_history(hist,team_idx):
+    # TODO: swap the dart history with a player switch (universal to game type)
+    return hist
+
+def swap_teams_history(hist):
+    # TODO: swap the dart history with a team switch (universal to game type)
+    return hist

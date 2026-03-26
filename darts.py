@@ -4,9 +4,9 @@ from tkinter import filedialog
 import json
 import os
 import numpy as np
-from dart_engine.params_cricket import Hit, Player, Team, CricketGame
+from dart_engine.params_cricket import Hit, CricketGame
 from dart_engine.helpers_cricket import get_game_marks, cricket_marks
-from dart_engine.helpers_general import interpret_click
+from dart_engine.helpers_general import interpret_click, swap_players_history, swap_teams_history
 
 # -------------------------
 # Constants
@@ -284,14 +284,17 @@ class DartsApp:
 
     def swap_teams(self):
         self.game.teams[0], self.game.teams[1] = self.game.teams[1], self.game.teams[0]
+        self.dart_history = swap_teams_history(self.dart_history)
         self.update_label()
 
     def swap_players_team_1(self):
         self.game.teams[0].players[0], self.game.teams[0].players[1] = self.game.teams[0].players[1], self.game.teams[0].players[0]
+        self.dart_history = swap_players_history(self.dart_history,0)
         self.update_label()
 
     def swap_players_team_2(self):
         self.game.teams[1].players[0], self.game.teams[1].players[1] = self.game.teams[1].players[1], self.game.teams[1].players[0]
+        self.dart_history = swap_players_history(self.dart_history,1)
         self.update_label()
 
     def draw_scoreboard(self):
