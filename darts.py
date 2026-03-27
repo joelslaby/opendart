@@ -478,6 +478,9 @@ class DartsApp:
                     p0_current_hits.append(f"{hit['number']}") if hit["multiplier"] == 1 else p0_current_hits.append(f"D{hit['number']}") if hit["multiplier"] == 2 else p0_current_hits.append(f"T{hit['number']}")
                     current_name = player_list[3].name
                     next_player_flag = True
+                elif hist[0]["player"] == player_list[3].name:
+                    current_name = player_list[3].name
+                    next_player_flag = True
                 else:
                     current_name = player_list[0].name   
                     next_player_flag = False
@@ -492,7 +495,7 @@ class DartsApp:
             next_team = self.game.teams[1].name
         else:
             current_team = self.game.teams[1].name
-            next_team = self.game.teams[1].name
+            next_team = self.game.teams[0].name
 
         p0_hits = p0_hits[::-1]
         p1_hits = p1_hits[::-1]
