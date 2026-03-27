@@ -3,8 +3,7 @@ from PIL import Image, ImageTk
 from tkinter import filedialog
 import json
 import os
-import numpy as np
-from dart_engine.params_501 import Hit, Player, Team, Game501
+from dart_engine.params_501 import Hit, Game501
 from dart_engine.helpers_501 import get_past_scores
 from dart_engine.helpers_general import interpret_click, swap_players_history, swap_teams_history
 
@@ -54,9 +53,6 @@ class DartsApp:
         self.cursor_label = tk.Label(root, text="x: 0  y: 0", font=("Arial",10))
         self.cursor_label.pack(anchor="w")
 
-        self.score_label = tk.Label(root, text="dart score: 0", font=("Arial",10))
-        self.score_label.pack(anchor="e")
-
         self.canvas.bind("<Button-1>", self.click)
         self.canvas.bind("<Motion>", self.update_cursor)
 
@@ -65,9 +61,6 @@ class DartsApp:
 
         self.info_canvas = tk.Canvas(root, width=self.size-7, height=y-600-4, bg=INFOBOARD_BG)
         self.info_canvas.place(x=x/2-self.size/2+1, y=600)
-
-        self.label = tk.Label(root, font=("Arial",14))
-        self.label.pack(anchor="se")
 
         btn_frame1 = tk.Frame(root)
         btn_frame1.place(x=10, y=630)
@@ -103,8 +96,6 @@ class DartsApp:
     def click(self,event):
 
         number, mult = interpret_click(event.x,event.y)
-
-        self.score_label.config(text=f"dart score: {number}, {mult}")
 
         if number is None:
             return
@@ -146,37 +137,7 @@ class DartsApp:
         self.update_label()
 
     def update_label(self):
-
-        g = self.game
-
-        player = g.active_player()
-
-        team = g.teams[g.current_team]
-
-        player0 = self.game.teams[0].players[0]
-        player1 = self.game.teams[1].players[0] 
-        player2 = self.game.teams[0].players[1]
-        player3 = self.game.teams[1].players[1] 
-
-        k = [player0.name, player1.name, player2.name, player3.name].index(player.name)
-        arr = [player0.name, player1.name, player2.name, player3.name]
-
-        k = 4 - k
-        k %= len(arr)
-        # Concatenate the part after the shift point with the part before it
-        upcoming_list = arr[-k:] + arr[:-k]
-    
-        text = f"""
-            Current Team: {team.name}
-            Player: {player.name}
-            Darts this turn: {g.darts_in_turn}
-            Next Players: {upcoming_list[1]}, {upcoming_list[2]}, {upcoming_list[3]}
-            """
-
-        self.label.config(text=text)
-
         self.draw_infoboard()
-
         self.draw_scoreboard()
 
     def clear_team_darts(self):
@@ -401,8 +362,6 @@ class DartsApp:
 
         player = g.active_player()
 
-        team = g.teams[g.current_team]
-
         player0 = self.game.teams[0].players[0]
         player1 = self.game.teams[1].players[0] 
         player2 = self.game.teams[0].players[1]
@@ -506,25 +465,33 @@ class DartsApp:
             fill=T1_COLOR if current_name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name] else T2_COLOR
         )
 
+        # Current throws
+        c.create_line(panel_width*1/4, 40, panel_width*7/4, 40, fill="black", width=2)
+        c.create_line(panel_width*1/4, 120, panel_width*7/4, 120, fill="black", width=2)
+        c.create_line(panel_width*1/4, 40, panel_width*1/4, 120, fill="black", width=2)
+        c.create_line(panel_width*3/4, 40, panel_width*3/4, 120, fill="black", width=2)
+        c.create_line(panel_width*5/4, 40, panel_width*5/4, 120, fill="black", width=2)
+        c.create_line(panel_width*7/4, 40, panel_width*7/4, 120, fill="black", width=2)
+
         c.create_text(
             panel_width*1/2,
             60,
             text=f"1",
-            font=("Arial",30,"underline","bold"),
+            font=("Arial",20,"underline","bold"),
             fill="black"
         )
         c.create_text(
             panel_width,
             60,
             text=f"2",
-            font=("Arial",30,"underline","bold"),
+            font=("Arial",20,"underline","bold"),
             fill="black"
         )
         c.create_text(
             panel_width*3/2,
             60,
             text=f"3",
-            font=("Arial",30,"underline","bold"),
+            font=("Arial",20,"underline","bold"),
             fill="black"
         )
 
