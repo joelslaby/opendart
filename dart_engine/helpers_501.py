@@ -1,10 +1,37 @@
 import numpy as np
+import csv
 
 # ---------------------------
 # Display functions
 # ---------------------------
 
+def get_recommended_hits(num_darts_left,points):
 
+    hits = []
+
+    with open('references/dart_out_chart.csv', newline='') as csvfile:
+        reader = csv.reader(csvfile, delimiter=',')
+        for nn, row in enumerate(reader):
+            if nn != 0:
+                if int(row[0]) == points:
+                    hits = row[1:4]
+                    if not hits[2]:
+                        hits = hits[:-1]
+                    if not hits[1]:
+                        hits = hits[:-1]
+                    if not hits[0]:
+                        hits = hits[:-1]
+    if num_darts_left == 1:
+        if len(hits) > 2:
+            hits = []
+    if num_darts_left == 2:
+        if len(hits) > 1:
+            hits = []
+    return hits
+            
+    
+
+    
 
 # ---------------------------
 # Score calculation functions
