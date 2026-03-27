@@ -3,9 +3,8 @@ from PIL import Image, ImageTk
 from tkinter import filedialog
 import json
 import os
-import numpy as np
-from dart_engine.params_501 import Hit, Player, Team, Game501
-from dart_engine.helpers_501 import get_past_scores
+from dart_engine.params_501 import Hit, Game501
+from dart_engine.helpers_501 import get_past_scores, get_recommended_hits
 from dart_engine.helpers_general import interpret_click, swap_players_history, swap_teams_history
 
 # -------------------------
@@ -20,7 +19,11 @@ SAVE_FILE = "darts_save.json"
 T1_COLOR = "dodgerblue"
 T2_COLOR = "blueviolet"
 SCOREBOARD_BG = "saddlebrown"
+SCOREBOARD_HIGHLIGHT = "chocolate"
 INFOBOARD_BG = "white"
+RECBOARD_BG = "#323232"
+REC_FILL = "dimgray"
+REC_FILL_RED = "dimgray" # "maroon"
 
 # -------------------------
 # GUI
@@ -51,26 +54,18 @@ class DartsApp:
 
         self.canvas.create_image(0,0,anchor=tk.NW,image=self.board_img)
 
-        self.cursor_label = tk.Label(root, text="x: 0  y: 0", font=("Arial",10))
-        self.cursor_label.pack(anchor="w")
-
-        self.score_label = tk.Label(root, text="dart score: 0", font=("Arial",10))
-        self.score_label.pack(anchor="e")
-
         self.canvas.bind("<Button-1>", self.click)
-        self.canvas.bind("<Motion>", self.update_cursor)
-
         self.score_canvas = tk.Canvas(root, width=x/2-self.size/2-2, height=600-2, bg=SCOREBOARD_BG)
         self.score_canvas.place(x=0, y=0)
+
+        self.rec_canvas = tk.Canvas(root, width=x/2-self.size/2-2, height=100-2, bg=RECBOARD_BG)
+        self.rec_canvas.place(x=0, y=600)
 
         self.info_canvas = tk.Canvas(root, width=self.size-7, height=y-600-4, bg=INFOBOARD_BG)
         self.info_canvas.place(x=x/2-self.size/2+1, y=600)
 
-        self.label = tk.Label(root, font=("Arial",14))
-        self.label.pack(anchor="se")
-
         btn_frame1 = tk.Frame(root)
-        btn_frame1.place(x=10, y=630)
+        btn_frame1.place(x=10, y=730)
 
         tk.Button(btn_frame1,text="Undo",font=("Arial",30),command=self.undo).pack(side=tk.LEFT)
         tk.Button(btn_frame1,text="Save",font=("Arial",30),command=self.save).pack(side=tk.LEFT)
@@ -78,7 +73,7 @@ class DartsApp:
         tk.Button(btn_frame1,text="Reset",font=("Arial",30),command=self.reset).pack(side=tk.LEFT)
 
         btn_frame2 = tk.Frame(root)
-        btn_frame2.place(x=50, y=680)
+        btn_frame2.place(x=50, y=780)
         tk.Button(btn_frame2,text="Swap Teams",font=("Arial",30),command=self.swap_teams).pack(side=tk.TOP)
         tk.Button(btn_frame2,text="Swap Players (Team 1)",font=("Arial",30),command=self.swap_players_team_1).pack(side=tk.TOP)
         tk.Button(btn_frame2,text="Swap Players (Team 2)",font=("Arial",30),command=self.swap_players_team_2).pack(side=tk.TOP)
@@ -92,19 +87,9 @@ class DartsApp:
 
         self.update_label()
 
-    
-    def update_cursor(self, event):
-
-        x = event.x
-        y = event.y
-
-        self.cursor_label.config(text=f"x: {x}   y: {y}")
-
     def click(self,event):
 
         number, mult = interpret_click(event.x,event.y)
-
-        self.score_label.config(text=f"dart score: {number}, {mult}")
 
         if number is None:
             return
@@ -146,38 +131,9 @@ class DartsApp:
         self.update_label()
 
     def update_label(self):
-
-        g = self.game
-
-        player = g.active_player()
-
-        team = g.teams[g.current_team]
-
-        player0 = self.game.teams[0].players[0]
-        player1 = self.game.teams[1].players[0] 
-        player2 = self.game.teams[0].players[1]
-        player3 = self.game.teams[1].players[1] 
-
-        k = [player0.name, player1.name, player2.name, player3.name].index(player.name)
-        arr = [player0.name, player1.name, player2.name, player3.name]
-
-        k = 4 - k
-        k %= len(arr)
-        # Concatenate the part after the shift point with the part before it
-        upcoming_list = arr[-k:] + arr[:-k]
-    
-        text = f"""
-            Current Team: {team.name}
-            Player: {player.name}
-            Darts this turn: {g.darts_in_turn}
-            Next Players: {upcoming_list[1]}, {upcoming_list[2]}, {upcoming_list[3]}
-            """
-
-        self.label.config(text=text)
-
         self.draw_infoboard()
-
         self.draw_scoreboard()
+        self.draw_recboard()
 
     def clear_team_darts(self):
         
@@ -306,6 +262,30 @@ class DartsApp:
         size_y = 600
         row_height = 68
         start_y = 90
+        highlight_width = 80
+
+        y = start_y + (7)*row_height
+
+        g = self.game
+
+        player = g.active_player()
+
+        player0 = self.game.teams[0].players[0]
+        player1 = self.game.teams[0].players[1] 
+        player2 = self.game.teams[1].players[0]
+        player3 = self.game.teams[1].players[1] 
+
+        current_player_idx = [player0.name, player1.name, player2.name, player3.name].index(player.name)
+
+        # Highlight current player
+        c.create_rectangle(
+            size_x*(1 + 2*current_player_idx)/8-highlight_width/2,
+            60,
+            size_x*(1 + 2*current_player_idx)/8+highlight_width/2,
+            start_y + (13/2)*row_height,
+            fill=SCOREBOARD_HIGHLIGHT,
+            outline=SCOREBOARD_HIGHLIGHT
+        )
 
         # Team labels
 
@@ -344,8 +324,6 @@ class DartsApp:
 
 
         # Score column
-
-        y = start_y + (7)*row_height
         
         c.create_line(0, y - row_height/2, size_x, y - row_height/2, fill="white", width=2)
 
@@ -401,16 +379,14 @@ class DartsApp:
 
         player = g.active_player()
 
-        team = g.teams[g.current_team]
-
         player0 = self.game.teams[0].players[0]
         player1 = self.game.teams[1].players[0] 
         player2 = self.game.teams[0].players[1]
         player3 = self.game.teams[1].players[1] 
 
-        k = [player0.name, player1.name, player2.name, player3.name].index(player.name)
+        current_player_idx = [player0.name, player1.name, player2.name, player3.name].index(player.name)
         arr = [player0.name, player1.name, player2.name, player3.name]
-        k = 4 - k
+        k = 4 - current_player_idx
         k %= len(arr)
         player_list = [player0, player1, player2, player3]
         player_list = player_list[-k:] + player_list[:-k]
@@ -451,6 +427,9 @@ class DartsApp:
                     p0_current_hits.append(f"{hit['number']}") if hit["multiplier"] == 1 else p0_current_hits.append(f"D{hit['number']}") if hit["multiplier"] == 2 else p0_current_hits.append(f"T{hit['number']}")
                     current_name = player_list[3].name
                     next_player_flag = True
+                elif hist[0]["player"] == player_list[3].name:
+                    current_name = player_list[3].name
+                    next_player_flag = True
                 else:
                     current_name = player_list[0].name   
                     next_player_flag = False
@@ -465,7 +444,7 @@ class DartsApp:
             next_team = self.game.teams[1].name
         else:
             current_team = self.game.teams[1].name
-            next_team = self.game.teams[1].name
+            next_team = self.game.teams[0].name
 
         p0_hits = p0_hits[::-1]
         p1_hits = p1_hits[::-1]
@@ -506,25 +485,33 @@ class DartsApp:
             fill=T1_COLOR if current_name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name] else T2_COLOR
         )
 
+        # Current throws
+        c.create_line(panel_width*1/4, 40, panel_width*7/4, 40, fill="black", width=2)
+        c.create_line(panel_width*1/4, 120, panel_width*7/4, 120, fill="black", width=2)
+        c.create_line(panel_width*1/4, 40, panel_width*1/4, 120, fill="black", width=2)
+        c.create_line(panel_width*3/4, 40, panel_width*3/4, 120, fill="black", width=2)
+        c.create_line(panel_width*5/4, 40, panel_width*5/4, 120, fill="black", width=2)
+        c.create_line(panel_width*7/4, 40, panel_width*7/4, 120, fill="black", width=2)
+
         c.create_text(
             panel_width*1/2,
             60,
             text=f"1",
-            font=("Arial",30,"underline","bold"),
+            font=("Arial",20,"underline","bold"),
             fill="black"
         )
         c.create_text(
             panel_width,
             60,
             text=f"2",
-            font=("Arial",30,"underline","bold"),
+            font=("Arial",20,"underline","bold"),
             fill="black"
         )
         c.create_text(
             panel_width*3/2,
             60,
             text=f"3",
-            font=("Arial",30,"underline","bold"),
+            font=("Arial",20,"underline","bold"),
             fill="black"
         )
 
@@ -757,6 +744,64 @@ class DartsApp:
                     fill="black"
                 )
             x_pos += panel_width
+    
+    def draw_recboard(self):
+        c = self.rec_canvas
+        c.delete("all")
+
+        size_x = 454
+        size_y = 98
+        rec_size_x = 100
+        rec_size_y = 60
+
+        player = self.game.active_player()
+        team_1_flag = player.name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name]
+        score = self.game.teams[team_1_flag-1].score
+
+        hits = get_recommended_hits(self.game.darts_in_turn,score)
+
+        for hh, hit in enumerate(hits):
+            c.create_rectangle(
+                (hh+1)*size_x/(len(hits)+1)-rec_size_x/2,
+                size_y/2-rec_size_y/2,
+                (hh+1)*size_x/(len(hits)+1)+rec_size_x/2,
+                size_y/2+rec_size_y/2,
+                fill=REC_FILL,
+                outline=REC_FILL
+            )
+
+            c.create_text(
+                (hh+1)*size_x/(len(hits)+1),
+                size_y/2,
+                text=hit,
+                anchor="center",
+                font=("Arial",40,"bold"),
+                fill="white"
+            )
+
+        if not hits:
+            c.create_rectangle(
+                size_x/2-150,
+                size_y/2-rec_size_y/2,
+                size_x/2+150,
+                size_y/2+rec_size_y/2,
+                fill=REC_FILL_RED,
+                outline=REC_FILL_RED
+            )
+
+            c.create_text(
+                size_x/2,
+                size_y/2,
+                text="No Double Out",
+                anchor="center",
+                font=("Arial",40,"bold"),
+                fill="white"
+            )
+
+
+
+        
+
 
 # -------------------------
 # Run

@@ -3,7 +3,6 @@ from PIL import Image, ImageTk
 from tkinter import filedialog
 import json
 import os
-import numpy as np
 from dart_engine.params_cricket import Hit, CricketGame
 from dart_engine.helpers_cricket import get_game_marks, cricket_marks
 from dart_engine.helpers_general import interpret_click, swap_players_history, swap_teams_history
@@ -431,8 +430,6 @@ class DartsApp:
 
         player = g.active_player()
 
-        team = g.teams[g.current_team]
-
         player0 = self.game.teams[0].players[0]
         player1 = self.game.teams[1].players[0] 
         player2 = self.game.teams[0].players[1]
@@ -481,6 +478,9 @@ class DartsApp:
                     p0_current_hits.append(f"{hit['number']}") if hit["multiplier"] == 1 else p0_current_hits.append(f"D{hit['number']}") if hit["multiplier"] == 2 else p0_current_hits.append(f"T{hit['number']}")
                     current_name = player_list[3].name
                     next_player_flag = True
+                elif hist[0]["player"] == player_list[3].name:
+                    current_name = player_list[3].name
+                    next_player_flag = True
                 else:
                     current_name = player_list[0].name   
                     next_player_flag = False
@@ -495,7 +495,7 @@ class DartsApp:
             next_team = self.game.teams[1].name
         else:
             current_team = self.game.teams[1].name
-            next_team = self.game.teams[1].name
+            next_team = self.game.teams[0].name
 
         p0_hits = p0_hits[::-1]
         p1_hits = p1_hits[::-1]
@@ -531,25 +531,34 @@ class DartsApp:
             fill=T1_COLOR if current_name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name] else T2_COLOR
         )
 
+
+        # Current throws
+        c.create_line(panel_width*1/4, 40, panel_width*7/4, 40, fill="black", width=2)
+        c.create_line(panel_width*1/4, 120, panel_width*7/4, 120, fill="black", width=2)
+        c.create_line(panel_width*1/4, 40, panel_width*1/4, 120, fill="black", width=2)
+        c.create_line(panel_width*3/4, 40, panel_width*3/4, 120, fill="black", width=2)
+        c.create_line(panel_width*5/4, 40, panel_width*5/4, 120, fill="black", width=2)
+        c.create_line(panel_width*7/4, 40, panel_width*7/4, 120, fill="black", width=2)
+
         c.create_text(
             panel_width*1/2,
             60,
             text=f"1",
-            font=("Arial",30,"underline","bold"),
+            font=("Arial",20,"underline","bold"),
             fill="black"
         )
         c.create_text(
             panel_width,
             60,
             text=f"2",
-            font=("Arial",30,"underline","bold"),
+            font=("Arial",20,"underline","bold"),
             fill="black"
         )
         c.create_text(
             panel_width*3/2,
             60,
             text=f"3",
-            font=("Arial",30,"underline","bold"),
+            font=("Arial",20,"underline","bold"),
             fill="black"
         )
 
