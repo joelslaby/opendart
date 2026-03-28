@@ -97,16 +97,20 @@ class DartsApp:
         tk.Button(btn_frame2,text="Save As...",font=("Arial",30),command=self.save_as).pack(side=tk.RIGHT)
         
         btn_frame3 = tk.Frame(root)
-        btn_frame3.place(x=50, y=730)
+        btn_frame3.place(x=10, y=730)
         tk.Entry(
             btn_frame3,
             textvariable=self.folder_path_var,
             font=("Arial",16),
             width=40,
         ).pack(side=tk.TOP, pady=10)
-        tk.Button(btn_frame3,text="Swap Teams",font=("Arial",30),command=self.swap_teams).pack(side=tk.TOP)
-        tk.Button(btn_frame3,text="Swap Players (Team 1)",font=("Arial",30),command=self.swap_players_team_1).pack(side=tk.TOP)
-        tk.Button(btn_frame3,text="Swap Players (Team 2)",font=("Arial",30),command=self.swap_players_team_2).pack(side=tk.TOP)
+
+        btn_frame4 = tk.Frame(root)
+        btn_frame4.place(x=0, y=780)
+        tk.Label(btn_frame4, text="Swap:", font=("Arial",20)).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame4,text="Teams",font=("Arial",20),command=self.swap_teams).pack(side=tk.LEFT)
+        tk.Button(btn_frame4,text="Plyrs (T1)",font=("Arial",20),command=self.swap_players_team_1).pack(side=tk.LEFT)
+        tk.Button(btn_frame4,text="Plyrs (T2)",font=("Arial",20),command=self.swap_players_team_2).pack(side=tk.LEFT)
 
         # store markers for current turn (both teams)
         self.dart_markers_0 = []

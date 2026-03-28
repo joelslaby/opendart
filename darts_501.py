@@ -6,6 +6,7 @@ import os
 from dart_engine.params_501 import Hit, Game501
 from dart_engine.helpers_501 import get_past_scores, get_recommended_hits
 from dart_engine.helpers_general import interpret_click, swap_players_history, swap_teams_history,get_screen_size_tkinter
+from datetime import datetime
 
 # -------------------------
 # Constants
@@ -15,7 +16,7 @@ from dart_engine.helpers_general import interpret_click, swap_players_history, s
 BOARD_ORDER = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17,
                3, 19, 7, 16, 8, 11, 14, 9, 12, 5]
 CRICKET_NUMBERS = [20,19,18,17,16,15,25]
-SAVE_FILE = "darts_save.json"
+CONFIG_FILE = "dart_engine/config.json"
 T1_COLOR = "dodgerblue"
 T2_COLOR = "blueviolet"
 SCOREBOARD_BG = "saddlebrown"
@@ -40,6 +41,17 @@ class DartsApp:
         y = root.winfo_height()
 
         self.game = Game501()
+
+        # Load last folder if it exists
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, "r") as f:
+                data = json.load(f)
+                self.folder_path = data.get("last_folder", "")
+        else:
+            self.folder_path = None
+            
+        # Set the StringVar so Entry shows it
+        self.folder_path_var = tk.StringVar(value=self.folder_path if self.folder_path is not None else "Save directory not set")
 
         img = Image.open("dartboard_images/dartboard.png")
         self.size = 600
@@ -68,7 +80,7 @@ class DartsApp:
         self.info_canvas.place(x=x/2-self.size/2+1, y=600)
 
         btn_frame1 = tk.Frame(root)
-        btn_frame1.place(x=10, y=730)
+        btn_frame1.place(x=5, y=690)
 
         tk.Button(btn_frame1,text="Undo",font=("Arial",30),command=self.undo).pack(side=tk.LEFT)
         tk.Button(btn_frame1,text="Save",font=("Arial",30),command=self.save).pack(side=tk.LEFT)
@@ -76,10 +88,26 @@ class DartsApp:
         tk.Button(btn_frame1,text="Reset",font=("Arial",30),command=self.reset).pack(side=tk.LEFT)
 
         btn_frame2 = tk.Frame(root)
-        btn_frame2.place(x=50, y=780)
-        tk.Button(btn_frame2,text="Swap Teams",font=("Arial",30),command=self.swap_teams).pack(side=tk.TOP)
-        tk.Button(btn_frame2,text="Swap Players (Team 1)",font=("Arial",30),command=self.swap_players_team_1).pack(side=tk.TOP)
-        tk.Button(btn_frame2,text="Swap Players (Team 2)",font=("Arial",30),command=self.swap_players_team_2).pack(side=tk.TOP)
+        btn_frame2.place(x=5, y=740)
+        tk.Button(btn_frame2,text="Save Setup...",font=("Arial",30),command=self.save_setup).pack(side=tk.LEFT)
+        tk.Button(btn_frame2,text="Save As...",font=("Arial",30),command=self.save_as).pack(side=tk.RIGHT)
+
+        btn_frame3 = tk.Frame(root)
+        btn_frame3.place(x=50, y=790)
+        tk.Entry(
+            btn_frame3,
+            textvariable=self.folder_path_var,
+            font=("Arial",16),
+            width=40,
+        ).pack(side=tk.TOP, pady=10)
+
+        btn_frame4 = tk.Frame(root)
+        btn_frame4.place(x=0, y=840)
+        tk.Label(btn_frame4, text="Swap:", font=("Arial",20)).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame4,text="Teams",font=("Arial",20),command=self.swap_teams).pack(side=tk.LEFT)
+        tk.Button(btn_frame4,text="Plyrs (T1)",font=("Arial",20),command=self.swap_players_team_1).pack(side=tk.LEFT)
+        tk.Button(btn_frame4,text="Plyrs (T2)",font=("Arial",20),command=self.swap_players_team_2).pack(side=tk.LEFT)
+
 
         # store markers for current turn (both teams)
         self.dart_markers_0 = []
@@ -167,24 +195,56 @@ class DartsApp:
             self.canvas.delete(marker)
         self.dart_markers_1 = []
 
-    def save(self):
-        
-        file_path = filedialog.asksaveasfilename(
-            defaultextension=".json",
-            filetypes=[("JSON Documents", "*.json"), ("All Files", "*.*")]
+    def save_setup(self):
+
+        if self.folder_path is not None:
+            initialdir = self.folder_path
+        else:
+            initialdir = os.getcwd()
+
+        self.folder_path = filedialog.askdirectory(
+            title="Select a Directory to Save",
+            initialdir=initialdir
         )
 
-    # Check if the user cancelled the dialog
-        if not file_path:
+        # Check if the user cancelled the dialog
+        if not self.folder_path:
             return
+        
+        self.folder_path_var.set(self.folder_path)
+        with open(CONFIG_FILE, "w") as f:
+            json.dump({"last_folder": self.folder_path}, f)
 
-        self.game.save()
+    def save(self):
+
+        self.filename = f"cricket_{self.game.teams[0].name}_vs_{self.game.teams[1].name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
 
         data = {
             "dart_history": self.dart_history
         }
 
-        with open(file_path,"w") as f:
+        if self.folder_path is None:
+            self.save_as()
+            return
+
+        with open(os.path.join(self.folder_path, self.filename),"w") as f:
+            json.dump(data,f,indent=2)
+
+    def save_as(self):
+        self.file_path = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("JSON Documents", "*.json"), ("All Files", "*.*")]
+        )
+
+        # Check if the user cancelled the dialog
+        if not self.file_path:
+            return
+
+        data = {
+            "dart_history": self.dart_history
+        }
+
+        with open(self.file_path,"w") as f:
             json.dump(data,f,indent=2)
 
     def load(self):
