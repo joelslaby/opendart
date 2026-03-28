@@ -1,4 +1,5 @@
 import math
+import tkinter as tk
 
 # -------------------------
 # Dartboard math
@@ -64,3 +65,16 @@ def swap_players_history(hist,team_idx):
 def swap_teams_history(hist):
     # TODO: swap the dart history with a team switch (universal to game type)
     return hist
+
+# -------------------------
+# Display
+# -------------------------
+
+def get_screen_size_tkinter():
+    root = tk.Tk()
+    # Withdraw the window so it doesn't flash on the screen
+    root.withdraw()
+    width = root.winfo_screenwidth()
+    height = root.winfo_screenheight()
+    root.destroy() # Close the root window
+    return width, height
