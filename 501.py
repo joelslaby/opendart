@@ -417,9 +417,17 @@ class DartsApp:
         c.delete("all")
 
         width = 600
-        panel_height = 174
         panel_width = int((width)/3)
-        pfp_size = 100
+        screen_width, screen_height = get_screen_size_tkinter()
+        if screen_width == 1470:
+            panel_height = 162 #174
+            pfp_size = 98 #100
+        elif screen_width == 1512:
+            panel_height = 174
+            pfp_size = 100
+        else:
+            panel_height = 174
+            pfp_size = 100
         box_height = 40
 
         # Make lines to seperate panels

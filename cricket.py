@@ -68,9 +68,6 @@ class DartsApp:
         self.cursor_label = tk.Label(root, text="x: 0  y: 0", font=("Arial",10))
         self.cursor_label.pack(anchor="w")
 
-        self.score_label = tk.Label(root, text="dart score: 0", font=("Arial",10))
-        self.score_label.pack(anchor="e")
-
         self.canvas.bind("<Button-1>", self.click)
         self.canvas.bind("<Motion>", self.update_cursor)
 
@@ -131,7 +128,7 @@ class DartsApp:
 
         number, mult = interpret_click(event.x,event.y)
 
-        self.score_label.config(text=f"dart score: {number}, {mult}")
+        # self.score_label.config(text=f"dart score: {number}, {mult}")
 
         if number is None:
             return
@@ -176,36 +173,7 @@ class DartsApp:
 
     def update_label(self):
 
-        g = self.game
-
-        player = g.active_player()
-
-        team = g.teams[g.current_team]
-
-        player0 = self.game.teams[0].players[0]
-        player1 = self.game.teams[1].players[0] 
-        player2 = self.game.teams[0].players[1]
-        player3 = self.game.teams[1].players[1] 
-
-        k = [player0.name, player1.name, player2.name, player3.name].index(player.name)
-        arr = [player0.name, player1.name, player2.name, player3.name]
-
-        k = 4 - k
-        k %= len(arr)
-        # Concatenate the part after the shift point with the part before it
-        upcoming_list = arr[-k:] + arr[:-k]
-    
-        text = f"""
-            Current Team: {team.name}
-            Player: {player.name}
-            Darts this turn: {g.darts_in_turn}
-            Next Players: {upcoming_list[1]}, {upcoming_list[2]}, {upcoming_list[3]}
-            """
-
-        self.label.config(text=text)
-
         self.draw_infoboard()
-
         self.draw_scoreboard()
 
     def clear_team_darts(self):
