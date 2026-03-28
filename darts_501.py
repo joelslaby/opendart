@@ -5,7 +5,7 @@ import json
 import os
 from dart_engine.params_501 import Hit, Game501
 from dart_engine.helpers_501 import get_past_scores, get_recommended_hits
-from dart_engine.helpers_general import interpret_click, swap_players_history, swap_teams_history
+from dart_engine.helpers_general import interpret_click, swap_players_history, swap_teams_history,get_screen_size_tkinter
 
 # -------------------------
 # Constants
@@ -39,8 +39,6 @@ class DartsApp:
         x = root.winfo_width()
         y = root.winfo_height()
 
-        print(f"Screen size: {x}x{y}")
-
         self.game = Game501()
 
         img = Image.open("dartboard_images/dartboard.png")
@@ -51,10 +49,15 @@ class DartsApp:
 
         self.canvas = tk.Canvas(root, width=self.size, height=self.size)
         self.canvas.pack()
+        
+        self.canvas_zoom = tk.Canvas(root, width=x/2-self.size/2-2, height=x/2-self.size/2-2, bg="white")
+        self.canvas_zoom.place(x=x/2+self.size/2-3, y=0)
 
         self.canvas.create_image(0,0,anchor=tk.NW,image=self.board_img)
 
         self.canvas.bind("<Button-1>", self.click)
+        self.canvas.bind("<Motion>", self.update_cursor)
+
         self.score_canvas = tk.Canvas(root, width=x/2-self.size/2-2, height=600-2, bg=SCOREBOARD_BG)
         self.score_canvas.place(x=0, y=0)
 
@@ -86,6 +89,12 @@ class DartsApp:
         self.dart_history = []
 
         self.update_label()
+        self.update_label()
+
+    def update_cursor(self, event):
+        x = event.x
+        y = event.y
+        self.draw_zoomboard(x,y)
 
     def click(self,event):
 
@@ -129,6 +138,8 @@ class DartsApp:
             self.clear_team_darts()
 
         self.update_label()
+
+        self.draw_zoomboard(event.x,event.y)
 
     def update_label(self):
         self.draw_infoboard()
@@ -453,9 +464,9 @@ class DartsApp:
         p0_current_hits = p0_current_hits[::-1]
 
         team_1_flag_0 = player_list[0].name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name]
-        team_1_flag_1 = player_list[0].name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name]
-        team_1_flag_2 = player_list[0].name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name]
-        team_1_flag_3 = player_list[0].name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name]
+        team_1_flag_1 = player_list[1].name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name]
+        team_1_flag_2 = player_list[2].name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name]
+        team_1_flag_3 = player_list[3].name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name]
 
         p0_hit_sum = get_past_scores(self.dart_history,player_list[0].name,team_1_flag_0)[-1]
         p1_hit_sum = get_past_scores(self.dart_history,player_list[1].name,team_1_flag_1)[-1]
@@ -798,9 +809,78 @@ class DartsApp:
                 fill="white"
             )
 
+    def draw_zoomboard(self,x,y):
+        c = self.canvas_zoom
+        c.delete("all")
+
+        zoom_factor = 3
+        line_size = 50
+        screen_width, screen_height = get_screen_size_tkinter()
+        if screen_width == 1470:
+            canvas_size = 460
+        elif screen_width == 1512:
+            canvas_size = 460
+        else:
+            canvas_size = 460
+        img = Image.open("dartboard_images/dartboard.png")
+        img = img.resize((600, 600))
+        img = img.crop((int(x-300/zoom_factor),int(y-300/zoom_factor),int(x+300/zoom_factor),int(y+300/zoom_factor)))
+        img = img.resize((canvas_size,canvas_size), Image.Resampling.LANCZOS)
+        self.zoom_img = ImageTk.PhotoImage(img)
+        c.create_image(0,0,anchor=tk.NW,image=self.zoom_img)
+
+        # Dart markers
+        hist = self.dart_history[::-1]
+        recent_hist = hist[0:6]
+
+        if hist:
+            current_player = hist[0]["player"]
+            x0 = []
+            y0 = []
+            x1 = []
+            y1 = []
+            n_players = 0
+            for hh,hit in enumerate(recent_hist):
+                if hit["player"] != current_player:
+                    n_players +=1
+                    current_player = hit["player"]
+                if n_players > 1:
+                    continue
+                
+                if hit["team"] == 0:
+                    x0.append(hit["x"])
+                    y0.append(hit["y"])
+                    if hh == 5:
+                        x0 = []
+                        y0 = []
+                else:
+                    x1.append(hit["x"])
+                    y1.append(hit["y"])
+                    if hh == 5:
+                        x1 = []
+                        y1 = []
 
 
-        
+            for nn in range(len(x0)):
+                x_dot = (x0[nn] - x)/600*canvas_size*zoom_factor+canvas_size/2
+                y_dot = (y0[nn] - y)/600*canvas_size*zoom_factor+canvas_size/2
+                c.create_oval(
+                    x_dot-5, y_dot-5,
+                    x_dot+5, y_dot+5,
+                    fill=T1_COLOR, outline=""
+                )
+            for nn in range(len(x1)):
+                x_dot = (x1[nn] - x)/600*canvas_size*zoom_factor+canvas_size/2
+                y_dot = (y1[nn] - y)/600*canvas_size*zoom_factor+canvas_size/2
+                c.create_oval(
+                    x_dot-5, y_dot-5,
+                    x_dot+5, y_dot+5,
+                    fill=T2_COLOR, outline=""
+                )
+
+        # Center cross
+        c.create_line(canvas_size/2-line_size/2,canvas_size/2,canvas_size/2+line_size/2,canvas_size/2,width=4,fill=T1_COLOR if self.game.active_player().name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name] else T2_COLOR)
+        c.create_line(canvas_size/2,canvas_size/2-line_size/2,canvas_size/2,canvas_size/2+line_size/2,width=4,fill=T1_COLOR if self.game.active_player().name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name] else T2_COLOR)
 
 
 # -------------------------
