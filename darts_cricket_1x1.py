@@ -52,12 +52,6 @@ class DartsApp:
 
         self.canvas.create_image(0,0,anchor=tk.NW,image=self.board_img)
 
-        self.cursor_label = tk.Label(root, text="x: 0  y: 0", font=("Arial",10))
-        self.cursor_label.pack(anchor="w")
-
-        self.score_label = tk.Label(root, text="dart score: 0", font=("Arial",10))
-        self.score_label.pack(anchor="e")
-
         self.canvas.bind("<Button-1>", self.click)
         self.canvas.bind("<Motion>", self.update_cursor)
 
@@ -66,9 +60,6 @@ class DartsApp:
 
         self.info_canvas = tk.Canvas(root, width=self.size-7, height=y-600-4, bg=INFOBOARD_BG)
         self.info_canvas.place(x=x/2-self.size/2+1, y=600)
-
-        self.label = tk.Label(root, font=("Arial",14))
-        self.label.pack(anchor="se")
 
         btn_frame1 = tk.Frame(root)
         btn_frame1.place(x=10, y=630)
@@ -79,7 +70,7 @@ class DartsApp:
         tk.Button(btn_frame1,text="Reset",font=("Arial",30),command=self.reset).pack(side=tk.LEFT)
 
         btn_frame2 = tk.Frame(root)
-        btn_frame2.place(x=50, y=680)
+        btn_frame2.place(x=10, y=680)
         tk.Button(btn_frame2,text="Swap Players",font=("Arial",30),command=self.swap_players).pack(side=tk.TOP)
 
         # store markers for current turn (both teams)
@@ -94,14 +85,11 @@ class DartsApp:
     def update_cursor(self, event):
         x = event.x
         y = event.y
-        self.cursor_label.config(text=f"x: {x}   y: {y}")
         self.draw_zoomboard(x,y)
 
     def click(self,event):
 
         number, mult = interpret_click(event.x,event.y)
-
-        self.score_label.config(text=f"dart score: {number}, {mult}")
 
         if number is None:
             return
@@ -144,32 +132,7 @@ class DartsApp:
         self.draw_zoomboard(event.x,event.y)
 
     def update_label(self):
-
-        g = self.game
-
-        player = g.active_player()
-
-        player0 = self.game.players[0]
-        player1 = self.game.players[1] 
-
-        k = [player0.name, player1.name].index(player.name)
-        arr = [player0.name, player1.name]
-
-        k = 2 - k
-        k %= len(arr)
-        # Concatenate the part after the shift point with the part before it
-        upcoming_list = arr[-k:] + arr[:-k]
-    
-        text = f"""
-            Player: {player.name}
-            Darts this turn: {g.darts_in_turn}
-            Next Players: {upcoming_list[1]}
-            """
-
-        self.label.config(text=text)
-
         self.draw_infoboard()
-
         self.draw_scoreboard()
 
     def clear_team_darts(self):
@@ -483,8 +446,8 @@ class DartsApp:
         p1_hits = p1_hits[::-1]
         p0_current_hits = p0_current_hits[::-1]
 
-        p0_hit_sum = get_game_marks_complete(hist,[self.game.players[0],self.game.players[1]],player_list[0])[-1]
-        p1_hit_sum = get_game_marks_complete(hist,[self.game.players[0],self.game.players[1]],player_list[1])[-1]
+        p0_hit_sum = get_game_marks_complete(self.dart_history,[self.game.players[0],self.game.players[1]],player_list[0])[-1]
+        p1_hit_sum = get_game_marks_complete(self.dart_history,[self.game.players[0],self.game.players[1]],player_list[1])[-1]
         
         # Profile pictures
         image_extensions = ('.png', '.jpg', '.jpeg', '.gif', '.bmp')
@@ -588,7 +551,7 @@ class DartsApp:
 
         # Next player panel
         c.create_text(
-            width/2 - panel_width,
+            width/2 + panel_width,
             12+panel_height,
             text=player_list[1].name,
             font=("Arial",20,"bold"),
@@ -610,7 +573,7 @@ class DartsApp:
         self.root.image1 = image1
         
         c.create_image(
-            width/2 - panel_width,
+            width/2 + panel_width,
             72+panel_height,
             image=image1
         )
@@ -638,7 +601,7 @@ class DartsApp:
         )
 
         y_pos = panel_height*2 - box_height
-        x_pos = width/2 - panel_width*3/2 - panel_width/8
+        x_pos = width/2 + panel_width*1/2 - panel_width/8
         for pnl in range(1):
             x_shift = panel_width/4
             for l in range(3):
