@@ -65,6 +65,12 @@ class Team:
             return hits_over
         else:
             return 0
+        
+    def get_player_by_name(self, name):
+        for player in self.players:
+            if player.name == name:
+                return player
+        return None
 
 
 # -------------------------
@@ -131,3 +137,10 @@ class CricketGame:
             team.cricket_tallies = {num: 0 for num in CRICKET_NUMBERS}
             team.cricket_closed = {num: False for num in CRICKET_NUMBERS}
             team.score = 0
+
+    def get_player_by_name(self, name):
+        for team in self.teams:
+            player = team.get_player_by_name(name)
+            if player:
+                return player
+        return None

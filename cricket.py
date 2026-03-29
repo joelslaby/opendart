@@ -1,9 +1,10 @@
 import tkinter as tk
 from PIL import Image, ImageTk
 from tkinter import filedialog
+from tkinter import ttk
 import json
 import os
-from dart_engine.params_cricket import Hit, CricketGame
+from dart_engine.params_cricket import Hit, CricketGame, Player
 from dart_engine.helpers_cricket import get_game_marks_complete, cricket_marks
 from dart_engine.helpers_general import interpret_click, swap_players_history, swap_teams_history, get_screen_size_tkinter
 from datetime import datetime
@@ -44,10 +45,12 @@ class DartsApp:
         if os.path.exists(CONFIG_FILE):
             with open(CONFIG_FILE, "r") as f:
                 data = json.load(f)
-                self.folder_path = data.get("last_folder", "")
+                self.folder_path = data.get("last_folder", None)
+                self.player_options = data.get("player_options", ['Jacob', 'Joel', 'Dustin', 'Ravi'])
         else:
             self.folder_path = None
-            
+            self.player_options = ["Jacob", "Joel", "Dustin", "Ravi"]
+
         # Set the StringVar so Entry shows it
         self.folder_path_var = tk.StringVar(value=self.folder_path if self.folder_path is not None else "Save directory not set")
 
@@ -102,12 +105,66 @@ class DartsApp:
             width=40,
         ).pack(side=tk.TOP, pady=10)
 
+        self.team1a_player_var = tk.StringVar(value=self.player_options[0])
+        self.team1b_player_var = tk.StringVar(value=self.player_options[1])
+        self.team2a_player_var = tk.StringVar(value=self.player_options[2])
+        self.team2b_player_var = tk.StringVar(value=self.player_options[3])
+
         btn_frame4 = tk.Frame(root)
         btn_frame4.place(x=0, y=780)
-        tk.Label(btn_frame4, text="Swap:", font=("Arial",20)).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame4,text="Teams",font=("Arial",20),command=self.swap_teams).pack(side=tk.LEFT)
-        tk.Button(btn_frame4,text="Plyrs (T1)",font=("Arial",20),command=self.swap_players_team_1).pack(side=tk.LEFT)
-        tk.Button(btn_frame4,text="Plyrs (T2)",font=("Arial",20),command=self.swap_players_team_2).pack(side=tk.LEFT)
+
+        tk.Label(btn_frame4, text="Team 1: ", font=("Arial",20)).pack(side=tk.LEFT, padx=5)
+        self.dropdown_1a = ttk.Combobox(
+            btn_frame4,
+            textvariable=self.team1a_player_var,
+            values=self.player_options,
+            font=("Arial",20),
+            state="readonly",
+            width = 6
+        )
+        self.dropdown_1b = ttk.Combobox(
+            btn_frame4,
+            textvariable=self.team1b_player_var,
+            values=self.player_options,
+            font=("Arial",20),
+            state="readonly",
+            width = 6
+        )
+        self.dropdown_1a.pack(side=tk.LEFT)
+        self.dropdown_1b.pack(side=tk.LEFT)
+        self.dropdown_1a.bind("<<ComboboxSelected>>", self.update_team)
+        self.dropdown_1b.bind("<<ComboboxSelected>>", self.update_team)
+        tk.Button(btn_frame4,text="swap",font=("Arial",20),command=self.swap_players_team_1).pack(side=tk.LEFT)
+
+        btn_frame5 = tk.Frame(root)
+        btn_frame5.place(x=0, y=820)
+        tk.Label(btn_frame5, text="Team 2: ", font=("Arial",20)).pack(side=tk.LEFT, padx=5)
+        self.dropdown_2a = ttk.Combobox(
+            btn_frame5,
+            textvariable=self.team2a_player_var,
+            values=self.player_options,
+            font=("Arial",20),
+            state="readonly",
+            width = 6
+        )
+        self.dropdown_2b = ttk.Combobox(
+            btn_frame5,
+            textvariable=self.team2b_player_var,
+            values=self.player_options,
+            font=("Arial",20),
+            state="readonly",
+            width = 6
+        )
+        self.dropdown_2a.pack(side=tk.LEFT)
+        self.dropdown_2b.pack(side=tk.LEFT)
+        self.dropdown_2a.bind("<<ComboboxSelected>>", self.update_team)
+        self.dropdown_2b.bind("<<ComboboxSelected>>", self.update_team)
+        tk.Button(btn_frame5,text="swap",font=("Arial",20),command=self.swap_players_team_2).pack(side=tk.LEFT)
+
+        btn_frame6 = tk.Frame(root)
+        btn_frame6.place(x=0, y=855)
+        tk.Button(btn_frame6,text="Swap teams",font=("Arial",20),command=self.swap_teams).pack(side=tk.LEFT)
+        tk.Button(btn_frame6,text="Add Player",font=("Arial",20),command=self.add_player).pack(side=tk.LEFT)
 
         # store markers for current turn (both teams)
         self.dart_markers_0 = []
@@ -214,8 +271,16 @@ class DartsApp:
             return
         
         self.folder_path_var.set(self.folder_path)
-        with open(CONFIG_FILE, "w") as f:
-            json.dump({"last_folder": self.folder_path}, f)
+
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, "r") as f:
+                data:dict = json.load(f)
+                data.update({"last_folder": self.folder_path})
+            with open(CONFIG_FILE, "w") as f:
+                json.dump(data, f)
+        else:
+            with open(CONFIG_FILE, "w") as f:
+                json.dump({"last_folder": self.folder_path}, f)
 
     def save(self):
 
@@ -315,17 +380,53 @@ class DartsApp:
     def swap_teams(self):
         self.game.teams[0], self.game.teams[1] = self.game.teams[1], self.game.teams[0]
         self.dart_history = swap_teams_history(self.dart_history)
+        self.team1a_player_var.set(self.game.teams[0].players[0].name)
+        self.team1b_player_var.set(self.game.teams[0].players[1].name)
+        self.team2a_player_var.set(self.game.teams[1].players[0].name)
+        self.team2b_player_var.set(self.game.teams[1].players[1].name)
         self.update_label()
 
     def swap_players_team_1(self):
         self.game.teams[0].players[0], self.game.teams[0].players[1] = self.game.teams[0].players[1], self.game.teams[0].players[0]
         self.dart_history = swap_players_history(self.dart_history,0)
+        self.team1a_player_var.set(self.game.teams[0].players[0].name)
+        self.team1b_player_var.set(self.game.teams[0].players[1].name)
         self.update_label()
 
     def swap_players_team_2(self):
         self.game.teams[1].players[0], self.game.teams[1].players[1] = self.game.teams[1].players[1], self.game.teams[1].players[0]
         self.dart_history = swap_players_history(self.dart_history,1)
+        self.team2a_player_var.set(self.game.teams[1].players[0].name)
+        self.team2b_player_var.set(self.game.teams[1].players[1].name)
         self.update_label()
+
+    def update_team(self, player):
+        self.game.teams[0].players[0] = Player(self.team1a_player_var.get())
+        self.game.teams[0].players[1] = Player(self.team1b_player_var.get())
+        self.game.teams[1].players[0] = Player(self.team2a_player_var.get())
+        self.game.teams[1].players[1] = Player(self.team2b_player_var.get())
+        self.update_label()
+
+    def add_player(self):
+        # Implementation for adding a new player
+        dialog = tk.simpledialog.askstring("Add Player", "Enter player name:")
+        if dialog:
+            self.player_options.append(dialog)
+
+        self.dropdown_1a['values'] = self.player_options
+        self.dropdown_1b['values'] = self.player_options
+        self.dropdown_2a['values'] = self.player_options
+        self.dropdown_2b['values'] = self.player_options
+
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, "r") as f:
+                data:dict = json.load(f)
+                data.update({"player_options": self.player_options})
+            with open(CONFIG_FILE, "w") as f:
+                json.dump(data, f)
+        else:
+            with open(CONFIG_FILE, "w") as f:
+                json.dump({"player_options": self.player_options}, f)
 
     def draw_scoreboard(self):
 
@@ -388,9 +489,6 @@ class DartsApp:
         for i,num in enumerate(CRICKET_NUMBERS):
 
             hits = self.game.teams[0].cricket_display[num] + self.game.teams[0].cricket_tallies[num]
-
-            # hits = max(p.hits[num] for p in self.game.teams[0].players)
-            # hits = self.team.cricket_display[num]
 
             y = start_y + i*row_height
 
@@ -659,16 +757,18 @@ class DartsApp:
             fill=T1_COLOR if player_list[0].name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name] else T2_COLOR
         )
 
-        image_path = []
-        for root, dirs, files in os.walk(search_dir):
-            for fname in files:
-                # Check if the search string is in the filename and it is an image file
-                if player_list[0].name in fname and fname.lower().endswith(image_extensions):
-                    # Construct the full absolute path
-                    full_path = os.path.abspath(os.path.join(root, fname))
-                    image_path.append(full_path)
+        def get_profile_pic(player_index):
+            for root, _, files in os.walk(search_dir):
+                image_path = None
+                for fname in files:
+                    if player_list[player_index].name in fname and fname.lower().endswith(image_extensions):
+                        image_path = os.path.abspath(os.path.join(root, fname))
+            if image_path is None:
+                image_path = os.path.abspath(os.path.join(root, "default.png"))
 
-        original_image = Image.open(image_path[0])
+            return image_path
+        
+        original_image = Image.open(get_profile_pic(0))
         resized_image = original_image.resize((pfp_size,pfp_size))
         image0 = ImageTk.PhotoImage(resized_image)
         self.root.image0 = image0
@@ -688,16 +788,7 @@ class DartsApp:
             fill=T1_COLOR if player_list[1].name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name] else T2_COLOR
         )
 
-        image_path = []
-        for root, dirs, files in os.walk(search_dir):
-            for fname in files:
-                # Check if the search string is in the filename and it is an image file
-                if player_list[1].name in fname and fname.lower().endswith(image_extensions):
-                    # Construct the full absolute path
-                    full_path = os.path.abspath(os.path.join(root, fname))
-                    image_path.append(full_path)
-
-        original_image = Image.open(image_path[0])
+        original_image = Image.open(get_profile_pic(1))
         resized_image = original_image.resize((pfp_size,pfp_size))
         image1 = ImageTk.PhotoImage(resized_image)
         self.root.image1 = image1
@@ -717,16 +808,7 @@ class DartsApp:
             fill=T1_COLOR if player_list[2].name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name] else T2_COLOR
         )
 
-        image_path = []
-        for root, dirs, files in os.walk(search_dir):
-            for fname in files:
-                # Check if the search string is in the filename and it is an image file
-                if player_list[2].name in fname and fname.lower().endswith(image_extensions):
-                    # Construct the full absolute path
-                    full_path = os.path.abspath(os.path.join(root, fname))
-                    image_path.append(full_path)
-
-        original_image = Image.open(image_path[0])
+        original_image = Image.open(get_profile_pic(2))
         resized_image = original_image.resize((pfp_size,pfp_size))
         image2 = ImageTk.PhotoImage(resized_image)
         self.root.image2 = image2
@@ -746,16 +828,7 @@ class DartsApp:
             fill=T1_COLOR if player_list[3].name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name] else T2_COLOR
         )
 
-        image_path = []
-        for root, dirs, files in os.walk(search_dir):
-            for fname in files:
-                # Check if the search string is in the filename and it is an image file
-                if player_list[3].name in fname and fname.lower().endswith(image_extensions):
-                    # Construct the full absolute path
-                    full_path = os.path.abspath(os.path.join(root, fname))
-                    image_path.append(full_path)
-
-        original_image = Image.open(image_path[0])
+        original_image = Image.open(get_profile_pic(3))
         resized_image = original_image.resize((pfp_size,pfp_size))
         image3 = ImageTk.PhotoImage(resized_image)
         self.root.image3 = image3

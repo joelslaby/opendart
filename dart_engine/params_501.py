@@ -24,7 +24,12 @@ class Player:
     def add_hit(self, hit: Hit):
         self.darts_thrown += 1
         self.hit_history.append(hit)
-
+        
+    def get_player_by_name(self, name):
+        for player in self.players:
+            if player.name == name:
+                return player
+        return None
 
 # -------------------------
 # Team class
@@ -105,3 +110,10 @@ class Game501:
 
         for team in self.teams:
             team.score = 501
+
+    def get_player_by_name(self, name):
+        for team in self.teams:
+            player = team.get_player_by_name(name)
+            if player:
+                return player
+        return None
