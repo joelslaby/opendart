@@ -332,6 +332,23 @@ class DartsApp:
 
         self.dart_history = data["dart_history"]
 
+        unique_players = []
+        unique_players.append(self.dart_history[0]["player"])
+        unique_players.append(self.dart_history[6]["player"])
+        unique_players.append(self.dart_history[3]["player"])
+        unique_players.append(self.dart_history[9]["player"])
+
+        self.team1a_player_var.set(unique_players[0])
+        self.team1b_player_var.set(unique_players[1])
+        self.team2a_player_var.set(unique_players[2])
+        self.team2b_player_var.set(unique_players[3])
+
+        for player in unique_players:
+            if player not in self.player_options:
+                self.add_player(dialog_popup=False, name=player)
+
+        self.update_team(None)
+
         self.game.reset()
 
         for hit in self.dart_history:
@@ -407,11 +424,14 @@ class DartsApp:
         self.game.teams[1].players[1] = Player(self.team2b_player_var.get())
         self.update_label()
 
-    def add_player(self):
+    def add_player(self, dialog_popup=True, name=None):
         # Implementation for adding a new player
-        dialog = tk.simpledialog.askstring("Add Player", "Enter player name:")
-        if dialog:
-            self.player_options.append(dialog)
+        if dialog_popup:
+            dialog = tk.simpledialog.askstring("Add Player", "Enter player name:")
+            if dialog:
+                self.player_options.append(dialog)
+        elif name:
+            self.player_options.append(name)
 
         self.dropdown_1a['values'] = self.player_options
         self.dropdown_1b['values'] = self.player_options
