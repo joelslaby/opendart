@@ -29,7 +29,7 @@ def cricket_marks(hits):
 # Score calculation functions
 # ---------------------------
 
-def get_game_marks(hist,teams,player):
+def get_game_marks(hist,players,player):
 
     remaining_score_team_0 = 3*np.ones(len(CRICKET_NUMBERS))
     remaining_score_team_1 = 3*np.ones(len(CRICKET_NUMBERS))
@@ -46,7 +46,7 @@ def get_game_marks(hist,teams,player):
                 marks.append(0)
 
         if hit["number"] in CRICKET_NUMBERS:
-            if hit["player"] in [teams[0].players[0].name, teams[0].players[1].name]:
+            if hit["player"] in [players[0].name]:
                 if remaining_score_team_0[CRICKET_NUMBERS.index(hit["number"])] > 0:
                     idx = CRICKET_NUMBERS.index(hit["number"])
                     remaining_score_team_0[idx] -= hit["multiplier"]
@@ -85,7 +85,7 @@ def get_game_marks(hist,teams,player):
     
     return [int(m) for m in marks]
 
-def get_game_marks_complete(hist,teams,player):
+def get_game_marks_complete(hist,players,player):
 
     remaining_score_team_0 = 3*np.ones(len(CRICKET_NUMBERS))
     remaining_score_team_1 = 3*np.ones(len(CRICKET_NUMBERS))
@@ -105,7 +105,7 @@ def get_game_marks_complete(hist,teams,player):
                 marks.append(0)
 
         if hit["number"] in CRICKET_NUMBERS:
-            if hit["player"] in [teams[0].players[0].name, teams[0].players[1].name]:
+            if hit["player"] in [players[0].name]:
                 if remaining_score_team_0[CRICKET_NUMBERS.index(hit["number"])] > 0:
                     idx = CRICKET_NUMBERS.index(hit["number"])
                     remaining_score_team_0[idx] -= hit["multiplier"]
@@ -144,7 +144,7 @@ def get_game_marks_complete(hist,teams,player):
     
     return [int(m) for m in marks]
 
-def get_game_marks_sum(hist,teams,player):
+def get_game_marks_sum(hist,players,player):
 
     remaining_score_team_0 = 3*np.ones(len(CRICKET_NUMBERS))
     remaining_score_team_1 = 3*np.ones(len(CRICKET_NUMBERS))

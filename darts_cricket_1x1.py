@@ -3,9 +3,9 @@ from PIL import Image, ImageTk
 from tkinter import filedialog
 import json
 import os
-from dart_engine.params_cricket import Hit, CricketGame
-from dart_engine.helpers_cricket import get_game_marks, cricket_marks
-from dart_engine.helpers_general import interpret_click, swap_players_history, swap_teams_history
+from dart_engine.params_cricket_1x1 import Hit, CricketGame
+from dart_engine.helpers_cricket_1x1 import get_game_marks_complete, cricket_marks
+from dart_engine.helpers_general import interpret_click, swap_players_history, swap_teams_history, get_screen_size_tkinter
 
 # -------------------------
 # Constants
@@ -20,6 +20,7 @@ T1_COLOR = "dodgerblue"
 T2_COLOR = "blueviolet"
 SCOREBOARD_BG = "darkolivegreen"
 INFOBOARD_BG = "white"
+SCOREBOARD_HIGHLIGHT = "olivedrab"
 
 # -------------------------
 # GUI
@@ -35,8 +36,6 @@ class DartsApp:
         x = root.winfo_width()
         y = root.winfo_height()
 
-        print(f"Screen size: {x}x{y}")
-
         self.game = CricketGame()
 
         img = Image.open("dartboard_images/dartboard.png")
@@ -47,14 +46,11 @@ class DartsApp:
 
         self.canvas = tk.Canvas(root, width=self.size, height=self.size)
         self.canvas.pack()
+        
+        self.canvas_zoom = tk.Canvas(root, width=x/2-self.size/2-2, height=x/2-self.size/2-2, bg="white")
+        self.canvas_zoom.place(x=x/2+self.size/2-3, y=0)
 
         self.canvas.create_image(0,0,anchor=tk.NW,image=self.board_img)
-
-        self.cursor_label = tk.Label(root, text="x: 0  y: 0", font=("Arial",10))
-        self.cursor_label.pack(anchor="w")
-
-        self.score_label = tk.Label(root, text="dart score: 0", font=("Arial",10))
-        self.score_label.pack(anchor="e")
 
         self.canvas.bind("<Button-1>", self.click)
         self.canvas.bind("<Motion>", self.update_cursor)
@@ -65,9 +61,6 @@ class DartsApp:
         self.info_canvas = tk.Canvas(root, width=self.size-7, height=y-600-4, bg=INFOBOARD_BG)
         self.info_canvas.place(x=x/2-self.size/2+1, y=600)
 
-        self.label = tk.Label(root, font=("Arial",14))
-        self.label.pack(anchor="se")
-
         btn_frame1 = tk.Frame(root)
         btn_frame1.place(x=10, y=630)
 
@@ -77,10 +70,8 @@ class DartsApp:
         tk.Button(btn_frame1,text="Reset",font=("Arial",30),command=self.reset).pack(side=tk.LEFT)
 
         btn_frame2 = tk.Frame(root)
-        btn_frame2.place(x=50, y=680)
-        tk.Button(btn_frame2,text="Swap Teams",font=("Arial",30),command=self.swap_teams).pack(side=tk.TOP)
-        tk.Button(btn_frame2,text="Swap Players (Team 1)",font=("Arial",30),command=self.swap_players_team_1).pack(side=tk.TOP)
-        tk.Button(btn_frame2,text="Swap Players (Team 2)",font=("Arial",30),command=self.swap_players_team_2).pack(side=tk.TOP)
+        btn_frame2.place(x=10, y=680)
+        tk.Button(btn_frame2,text="Swap Players",font=("Arial",30),command=self.swap_players).pack(side=tk.TOP)
 
         # store markers for current turn (both teams)
         self.dart_markers_0 = []
@@ -91,25 +82,20 @@ class DartsApp:
 
         self.update_label()
 
-    
     def update_cursor(self, event):
-
         x = event.x
         y = event.y
-
-        self.cursor_label.config(text=f"x: {x}   y: {y}")
+        self.draw_zoomboard(x,y)
 
     def click(self,event):
 
         number, mult = interpret_click(event.x,event.y)
 
-        self.score_label.config(text=f"dart score: {number}, {mult}")
-
         if number is None:
             return
 
         # draw red dot
-        if self.game.current_team == 0:
+        if self.game.current_player == 0:
             dot = self.canvas.create_oval(
                 event.x-5, event.y-5,
                 event.x+5, event.y+5,
@@ -129,7 +115,6 @@ class DartsApp:
 
         self.dart_history.append({
             "player": player.name,
-            "team": self.game.current_team,
             "x": event.x,
             "y": event.y,
             "number": number,
@@ -144,43 +129,15 @@ class DartsApp:
 
         self.update_label()
 
+        self.draw_zoomboard(event.x,event.y)
+
     def update_label(self):
-
-        g = self.game
-
-        player = g.active_player()
-
-        team = g.teams[g.current_team]
-
-        player0 = self.game.teams[0].players[0]
-        player1 = self.game.teams[1].players[0] 
-        player2 = self.game.teams[0].players[1]
-        player3 = self.game.teams[1].players[1] 
-
-        k = [player0.name, player1.name, player2.name, player3.name].index(player.name)
-        arr = [player0.name, player1.name, player2.name, player3.name]
-
-        k = 4 - k
-        k %= len(arr)
-        # Concatenate the part after the shift point with the part before it
-        upcoming_list = arr[-k:] + arr[:-k]
-    
-        text = f"""
-            Current Team: {team.name}
-            Player: {player.name}
-            Darts this turn: {g.darts_in_turn}
-            Next Players: {upcoming_list[1]}, {upcoming_list[2]}, {upcoming_list[3]}
-            """
-
-        self.label.config(text=text)
-
         self.draw_infoboard()
-
         self.draw_scoreboard()
 
     def clear_team_darts(self):
         
-        if self.game.current_team == 0:
+        if self.game.current_player == 0:
             for marker in self.dart_markers_0:
                 self.canvas.delete(marker)
             self.dart_markers_0 = []
@@ -253,7 +210,7 @@ class DartsApp:
 
         for hit in self.dart_history:
             # draw red dot
-            if self.game.current_team == 0:
+            if self.game.current_player == 0:
                 dot = self.canvas.create_oval(
                     hit["x"]-5, hit["y"]-5,
                     hit["x"]+5, hit["y"]+5,
@@ -281,19 +238,9 @@ class DartsApp:
         self.clear_all_darts()
         self.update_label()
 
-    def swap_teams(self):
-        self.game.teams[0], self.game.teams[1] = self.game.teams[1], self.game.teams[0]
-        self.dart_history = swap_teams_history(self.dart_history)
-        self.update_label()
-
-    def swap_players_team_1(self):
-        self.game.teams[0].players[0], self.game.teams[0].players[1] = self.game.teams[0].players[1], self.game.teams[0].players[0]
-        self.dart_history = swap_players_history(self.dart_history,0)
-        self.update_label()
-
-    def swap_players_team_2(self):
-        self.game.teams[1].players[0], self.game.teams[1].players[1] = self.game.teams[1].players[1], self.game.teams[1].players[0]
-        self.dart_history = swap_players_history(self.dart_history,1)
+    def swap_players(self):
+        self.game.players[0], self.game.players[1] = self.game.players[1], self.game.players[0]
+        # self.dart_history = swap_players_history(self.dart_history,0) # TODO: fix swap player history when game started???
         self.update_label()
 
     def draw_scoreboard(self):
@@ -305,11 +252,24 @@ class DartsApp:
         mid_width = 80
         row_height = 68
         start_y = 90
+        highlight_width = 140
 
-        # Team labels
+        current_player_idx = self.game.current_player
 
-        c.create_text(size_x*1/4-mid_width/4,30,text=self.game.teams[0].name,font=("Arial",40,"bold"))
-        c.create_text(size_x*3/4+mid_width/4,30,text=self.game.teams[1].name,font=("Arial",40,"bold"))
+        # Highlight current team
+        c.create_rectangle(
+            size_x*(1 + 2*current_player_idx)/4-highlight_width/2-mid_width/4 + mid_width*current_player_idx/2,
+            0,
+            size_x*(1 + 2*current_player_idx)/4+highlight_width/2-mid_width/4 + mid_width*current_player_idx/2,
+            600,
+            fill=SCOREBOARD_HIGHLIGHT,
+            outline=SCOREBOARD_HIGHLIGHT
+        )
+
+        # Player labels
+
+        c.create_text(size_x*1/4-mid_width/4,30,text=self.game.players[0].name,font=("Arial",40,"bold"))
+        c.create_text(size_x*3/4+mid_width/4,30,text=self.game.players[1].name,font=("Arial",40,"bold"))
 
         c.create_line(0, 60, size_x, 60, fill="white", width=2)
         c.create_line(size_x/2-mid_width/2, 0, size_x/2-mid_width/2, 600, fill="white", width=2)
@@ -339,11 +299,11 @@ class DartsApp:
             font=("Arial",30,"bold")
         )
 
-        # Team A marks
+        # Player 0 marks
 
         for i,num in enumerate(CRICKET_NUMBERS):
 
-            hits = self.game.teams[0].cricket_display[num] + self.game.teams[0].cricket_tallies[num]
+            hits = self.game.players[0].cricket_display[num] + self.game.players[0].cricket_tallies[num]
 
             # hits = max(p.hits[num] for p in self.game.teams[0].players)
             # hits = self.team.cricket_display[num]
@@ -355,14 +315,14 @@ class DartsApp:
                 y,
                 text=cricket_marks(hits),
                 font=("Arial",30),
-                fill="darkgray" if self.game.teams[0].cricket_closed[num] and self.game.teams[1].cricket_closed[num] else "white"
+                fill="darkgray" if self.game.players[0].cricket_closed[num] and self.game.players[1].cricket_closed[num] else "white"
             )
 
-        # Team B marks
+        # Player 1 marks
 
         for i,num in enumerate(CRICKET_NUMBERS):
 
-            hits = self.game.teams[1].cricket_display[num] + self.game.teams[1].cricket_tallies[num]
+            hits = self.game.players[1].cricket_display[num] + self.game.players[1].cricket_tallies[num]
 
             y = start_y + i*row_height
 
@@ -371,7 +331,7 @@ class DartsApp:
                 y,
                 text=cricket_marks(hits),
                 font=("Arial",30),
-                fill="darkgray" if self.game.teams[0].cricket_closed[num] and self.game.teams[1].cricket_closed[num] else "white"
+                fill="darkgray" if self.game.players[0].cricket_closed[num] and self.game.players[1].cricket_closed[num] else "white"
             )
 
         # Score column
@@ -381,14 +341,14 @@ class DartsApp:
         c.create_text(
             size_x*1/4-mid_width/4,
             y,
-            text=str(self.game.teams[0].score),
+            text=str(self.game.players[0].score),
             font=("Arial",30,"bold")
         )
 
         c.create_text(
             size_x*3/4+mid_width/4,
             y,
-            text=str(self.game.teams[1].score),
+            text=str(self.game.players[1].score),
             font=("Arial",30,"bold")
         )
 
@@ -397,9 +357,17 @@ class DartsApp:
         c.delete("all")
 
         width = 600
-        panel_height = 162 #174
         panel_width = int((width)/3)
-        pfp_size = 98 #100
+        screen_width, screen_height = get_screen_size_tkinter()
+        if screen_width == 1470:
+            panel_height = 162 #174
+            pfp_size = 98 #100
+        elif screen_width == 1512:
+            panel_height = 174
+            pfp_size = 100
+        else:
+            panel_height = 174
+            pfp_size = 100
         box_height = 40
 
         # Make lines to seperate panels
@@ -430,16 +398,14 @@ class DartsApp:
 
         player = g.active_player()
 
-        player0 = self.game.teams[0].players[0]
-        player1 = self.game.teams[1].players[0] 
-        player2 = self.game.teams[0].players[1]
-        player3 = self.game.teams[1].players[1] 
+        player0 = self.game.players[0]
+        player1 = self.game.players[1]
 
-        k = [player0.name, player1.name, player2.name, player3.name].index(player.name)
-        arr = [player0.name, player1.name, player2.name, player3.name]
-        k = 4 - k
-        k %= len(arr)
-        player_list = [player0, player1, player2, player3]
+        k = [player0.name, player1.name].index(player.name)
+        player_list_orig = [player0.name, player1.name]
+        k = 2 - k
+        k %= len(player_list_orig)
+        player_list = [player0, player1]
         player_list = player_list[-k:] + player_list[:-k]
 
         hist = self.dart_history[::-1]
@@ -449,10 +415,6 @@ class DartsApp:
         p0_hits = []
         p1_hit_number = 0
         p1_hits = []
-        p2_hit_number = 0
-        p2_hits = []
-        p3_hit_number = 0
-        p3_hits = []
         current_name = player_list[0].name   
         next_player_flag = False
         for hh,hit in enumerate(hist):
@@ -461,52 +423,31 @@ class DartsApp:
                     continue
                 if hh > 2:
                     p0_hits.append(f"{hit['number']}") if hit["multiplier"] == 1 else p0_hits.append(f"D{hit['number']}") if hit["multiplier"] == 2 else p0_hits.append(f"T{hit['number']}")
+                    p0_hit_number += 1
                 else:
                     p0_current_hits.append(f"{hit['number']}") if hit["multiplier"] == 1 else p0_current_hits.append(f"D{hit['number']}") if hit["multiplier"] == 2 else p0_current_hits.append(f"T{hit['number']}")
             elif hit["player"] == player_list[1].name:
-                if p1_hit_number > 2:
-                    continue
-                p1_hits.append(f"{hit['number']}") if hit["multiplier"] == 1 else p1_hits.append(f"D{hit['number']}") if hit["multiplier"] == 2 else p1_hits.append(f"T{hit['number']}")
-                p1_hit_number += 1
-            elif hit["player"] == player_list[2].name:
-                if p2_hit_number > 2:
-                    continue
-                p2_hits.append(f"{hit['number']}") if hit["multiplier"] == 1 else p2_hits.append(f"D{hit['number']}") if hit["multiplier"] == 2 else p2_hits.append(f"T{hit['number']}")
-                p2_hit_number += 1
-            elif hit["player"] == player_list[3].name:
-                if hh <= 2 and hist[0]["player"] == player_list[3].name:
+                if hh <= 2 and hist[0]["player"] == player_list[1].name:
                     p0_current_hits.append(f"{hit['number']}") if hit["multiplier"] == 1 else p0_current_hits.append(f"D{hit['number']}") if hit["multiplier"] == 2 else p0_current_hits.append(f"T{hit['number']}")
-                    current_name = player_list[3].name
+                    current_name = player_list[1].name
                     next_player_flag = True
-                elif hist[0]["player"] == player_list[3].name:
-                    current_name = player_list[3].name
+                elif hist[0]["player"] == player_list[1].name:
+                    current_name = player_list[1].name
                     next_player_flag = True
                 else:
                     current_name = player_list[0].name   
                     next_player_flag = False
-                if p3_hit_number > 2:
+                if p1_hit_number > 2:
                     continue
-                p3_hits.append(f"{hit['number']}") if hit["multiplier"] == 1 else p3_hits.append(f"D{hit['number']}") if hit["multiplier"] == 2 else p3_hits.append(f"T{hit['number']}")
-                p3_hit_number += 1
-
-        team_1_flag = current_name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name]
-        if team_1_flag:
-            current_team = self.game.teams[0].name
-            next_team = self.game.teams[1].name
-        else:
-            current_team = self.game.teams[1].name
-            next_team = self.game.teams[0].name
+                p1_hits.append(f"{hit['number']}") if hit["multiplier"] == 1 else p1_hits.append(f"D{hit['number']}") if hit["multiplier"] == 2 else p1_hits.append(f"T{hit['number']}")
+                p1_hit_number += 1
 
         p0_hits = p0_hits[::-1]
         p1_hits = p1_hits[::-1]
-        p2_hits = p2_hits[::-1]
-        p3_hits = p3_hits[::-1]
         p0_current_hits = p0_current_hits[::-1]
 
-        p0_hit_sum = get_game_marks(self.dart_history,self.game.teams,player_list[0])[-1]
-        p1_hit_sum = get_game_marks(self.dart_history,self.game.teams,player_list[1])[-1]
-        p2_hit_sum = get_game_marks(self.dart_history,self.game.teams,player_list[2])[-1]
-        p3_hit_sum = get_game_marks(self.dart_history,self.game.teams,player_list[3])[-1]
+        p0_hit_sum = get_game_marks_complete(self.dart_history,[self.game.players[0],self.game.players[1]],player_list[0])[-1]
+        p1_hit_sum = get_game_marks_complete(self.dart_history,[self.game.players[0],self.game.players[1]],player_list[1])[-1]
         
         # Profile pictures
         image_extensions = ('.png', '.jpg', '.jpeg', '.gif', '.bmp')
@@ -519,18 +460,8 @@ class DartsApp:
             anchor="w",
             text=current_name,
             font=("Arial",30,"bold"),
-            fill=T1_COLOR if current_name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name] else T2_COLOR
+            fill=T1_COLOR if current_name in [self.game.players[0].name] else T2_COLOR
         )
-
-        c.create_text(
-            panel_width*2 - 10,
-            20,
-            text=current_team,
-            anchor="e",
-            font=("Arial",30,"bold"),
-            fill=T1_COLOR if current_name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name] else T2_COLOR
-        )
-
 
         # Current throws
         c.create_line(panel_width*1/4, 40, panel_width*7/4, 40, fill="black", width=2)
@@ -578,15 +509,7 @@ class DartsApp:
                 anchor="w",
                 text=f"Next player: {player_list[0].name}",
                 font=("Arial",30,"bold"),
-                fill=T1_COLOR if player_list[0].name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name] else T2_COLOR
-            )
-            c.create_text(
-                panel_width*2 - 10,
-                140,
-                anchor="e",
-                text=f"{next_team}",
-                font=("Arial",30,"bold"),
-                fill=T1_COLOR if player_list[0].name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name] else T2_COLOR
+                fill=T1_COLOR if player_list[0].name in [self.game.players[0].name] else T2_COLOR
             )
             c.create_text(
                 10,
@@ -603,7 +526,7 @@ class DartsApp:
             12,
             text=player_list[0].name,
             font=("Arial",20,"bold"),
-            fill=T1_COLOR if player_list[0].name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name] else T2_COLOR
+            fill=T1_COLOR if player_list[0].name in [self.game.players[0].name] else T2_COLOR
         )
 
         image_path = []
@@ -628,11 +551,11 @@ class DartsApp:
 
         # Next player panel
         c.create_text(
-            width/2 - panel_width,
+            width/2 + panel_width,
             12+panel_height,
             text=player_list[1].name,
             font=("Arial",20,"bold"),
-            fill=T1_COLOR if player_list[1].name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name] else T2_COLOR
+            fill=T1_COLOR if player_list[1].name in [self.game.players[0].name] else T2_COLOR
         )
 
         image_path = []
@@ -650,67 +573,9 @@ class DartsApp:
         self.root.image1 = image1
         
         c.create_image(
-            width/2 - panel_width,
+            width/2 + panel_width,
             72+panel_height,
             image=image1
-        )
-
-        #Next next player panel
-        c.create_text(
-            width/2,
-            12+panel_height,
-            text=player_list[2].name,
-            font=("Arial",20,"bold"),
-            fill=T1_COLOR if player_list[2].name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name] else T2_COLOR
-        )
-
-        image_path = []
-        for root, dirs, files in os.walk(search_dir):
-            for fname in files:
-                # Check if the search string is in the filename and it is an image file
-                if player_list[2].name in fname and fname.lower().endswith(image_extensions):
-                    # Construct the full absolute path
-                    full_path = os.path.abspath(os.path.join(root, fname))
-                    image_path.append(full_path)
-
-        original_image = Image.open(image_path[0])
-        resized_image = original_image.resize((pfp_size,pfp_size))
-        image2 = ImageTk.PhotoImage(resized_image)
-        self.root.image2 = image2
-        
-        c.create_image(
-            width/2,
-            72 + panel_height,
-            image=image2
-        )
-
-        #Next next next player panel
-        c.create_text(
-            width/2 + panel_width,
-            12+panel_height,
-            text=player_list[3].name,
-            font=("Arial",20,"bold"),
-            fill=T1_COLOR if player_list[3].name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name] else T2_COLOR
-        )
-
-        image_path = []
-        for root, dirs, files in os.walk(search_dir):
-            for fname in files:
-                # Check if the search string is in the filename and it is an image file
-                if player_list[3].name in fname and fname.lower().endswith(image_extensions):
-                    # Construct the full absolute path
-                    full_path = os.path.abspath(os.path.join(root, fname))
-                    image_path.append(full_path)
-
-        original_image = Image.open(image_path[0])
-        resized_image = original_image.resize((pfp_size,pfp_size))
-        image3 = ImageTk.PhotoImage(resized_image)
-        self.root.image3 = image3
-        
-        c.create_image(
-            width/2 + panel_width,
-            72+panel_height,
-            image=image3
         )
 
         # add text boxes for prior turn hits
@@ -736,8 +601,8 @@ class DartsApp:
         )
 
         y_pos = panel_height*2 - box_height
-        x_pos = width/2 - panel_width*3/2 - panel_width/8
-        for pnl in range(3):
+        x_pos = width/2 + panel_width*1/2 - panel_width/8
+        for pnl in range(1):
             x_shift = panel_width/4
             for l in range(3):
                 if pnl == 0:
@@ -745,22 +610,6 @@ class DartsApp:
                         x_pos + x_shift,
                         y_pos+box_height/2,
                         text=p1_hits[l] if l < len(p1_hits) else "-",
-                        font=("Arial",20),
-                        fill="black"
-                    )
-                elif pnl == 1:
-                    c.create_text(
-                        x_pos + x_shift,
-                        y_pos+box_height/2,
-                        text=p2_hits[l] if l < len(p2_hits) else "-",
-                        font=("Arial",20),
-                        fill="black"
-                    )
-                elif pnl == 2:
-                    c.create_text(
-                        x_pos + x_shift,
-                        y_pos+box_height/2,
-                        text=p3_hits[l] if l < len(p3_hits) else "-",
                         font=("Arial",20),
                         fill="black"
                     )
@@ -774,23 +623,81 @@ class DartsApp:
                     font=("Arial",20),
                     fill="black"
                 )
-            elif pnl == 1:
-                c.create_text(
-                    x_pos + x_shift,
-                    y_pos+box_height/2,
-                    text=f"{p2_hit_sum}M",
-                    font=("Arial",20),
-                    fill="black"
-                )
-            elif pnl == 2:
-                c.create_text(
-                    x_pos + x_shift,
-                    y_pos+box_height/2,
-                    text=f"{p3_hit_sum}M",
-                    font=("Arial",20),
-                    fill="black"
-                )
             x_pos += panel_width
+
+    def draw_zoomboard(self,x,y):
+        c = self.canvas_zoom
+        c.delete("all")
+
+        zoom_factor = 3
+        line_size = 50
+        screen_width, screen_height = get_screen_size_tkinter()
+        if screen_width == 1470:
+            canvas_size = 460
+        elif screen_width == 1512:
+            canvas_size = 460
+        else:
+            canvas_size = 460
+        img = Image.open("dartboard_images/dartboard.png")
+        img = img.resize((600, 600))
+        img = img.crop((int(x-300/zoom_factor),int(y-300/zoom_factor),int(x+300/zoom_factor),int(y+300/zoom_factor)))
+        img = img.resize((canvas_size,canvas_size), Image.Resampling.LANCZOS)
+        self.zoom_img = ImageTk.PhotoImage(img)
+        c.create_image(0,0,anchor=tk.NW,image=self.zoom_img)
+
+        # Dart markers
+        hist = self.dart_history[::-1]
+        recent_hist = hist[0:6]
+
+        if hist:
+            current_player = hist[0]["player"]
+            x0 = []
+            y0 = []
+            x1 = []
+            y1 = []
+            n_players = 0
+            for hh,hit in enumerate(recent_hist):
+                if hit["player"] != current_player:
+                    n_players +=1
+                    current_player = hit["player"]
+                if n_players > 1:
+                    continue
+                
+                if hit["player"] == self.game.players[0].name:
+                    x0.append(hit["x"])
+                    y0.append(hit["y"])
+                    if hh == 5:
+                        x0 = []
+                        y0 = []
+                else:
+                    x1.append(hit["x"])
+                    y1.append(hit["y"])
+                    if hh == 5:
+                        x1 = []
+                        y1 = []
+
+
+            for nn in range(len(x0)):
+                x_dot = (x0[nn] - x)/600*canvas_size*zoom_factor+canvas_size/2
+                y_dot = (y0[nn] - y)/600*canvas_size*zoom_factor+canvas_size/2
+                c.create_oval(
+                    x_dot-5, y_dot-5,
+                    x_dot+5, y_dot+5,
+                    fill=T1_COLOR, outline=""
+                )
+            for nn in range(len(x1)):
+                x_dot = (x1[nn] - x)/600*canvas_size*zoom_factor+canvas_size/2
+                y_dot = (y1[nn] - y)/600*canvas_size*zoom_factor+canvas_size/2
+                c.create_oval(
+                    x_dot-5, y_dot-5,
+                    x_dot+5, y_dot+5,
+                    fill=T2_COLOR, outline=""
+                )
+
+        # Center cross
+        c.create_line(canvas_size/2-line_size/2,canvas_size/2,canvas_size/2+line_size/2,canvas_size/2,width=4,fill=T1_COLOR if self.game.active_player().name in [self.game.players[0].name] else T2_COLOR)
+        c.create_line(canvas_size/2,canvas_size/2-line_size/2,canvas_size/2,canvas_size/2+line_size/2,width=4,fill=T1_COLOR if self.game.active_player().name in [self.game.players[0].name] else T2_COLOR)
+
 
 # -------------------------
 # Run
