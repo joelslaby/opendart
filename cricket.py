@@ -18,8 +18,8 @@ BOARD_ORDER = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17,
                3, 19, 7, 16, 8, 11, 14, 9, 12, 5]
 CRICKET_NUMBERS = [20,19,18,17,16,15,25]
 CONFIG_FILE = "dart_engine/config.json"
-T1_COLOR = "dodgerblue"
-T2_COLOR = "blueviolet"
+T1_COLOR = "#6a83ff"
+T2_COLOR = "#ec6d00"
 SCOREBOARD_BG = "darkolivegreen"
 INFOBOARD_BG = "white"
 SCOREBOARD_HIGHLIGHT = "olivedrab"
@@ -1010,6 +1010,9 @@ class DartsApp:
         # Center cross
         c.create_line(canvas_size/2-line_size/2,canvas_size/2,canvas_size/2+line_size/2,canvas_size/2,width=4,fill=T1_COLOR if self.game.active_player().name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name] else T2_COLOR)
         c.create_line(canvas_size/2,canvas_size/2-line_size/2,canvas_size/2,canvas_size/2+line_size/2,width=4,fill=T1_COLOR if self.game.active_player().name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name] else T2_COLOR)
+
+        number, mult = interpret_click(x,y)
+        c.create_text(canvas_size/2+75, canvas_size/2, text=f"T{number}" if mult == 3 else f"D{number}" if mult == 2 else f"{number}", fill=T1_COLOR if self.game.active_player().name in [self.game.teams[0].players[0].name, self.game.teams[0].players[1].name] else T2_COLOR, font=("Arial",40,"bold"))
 
 
 # -------------------------

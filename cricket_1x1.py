@@ -19,8 +19,9 @@ BOARD_ORDER = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17,
 CRICKET_NUMBERS = [20,19,18,17,16,15,25]
 CONFIG_FILE = "dart_engine/config.json"
 SAVE_FILE = "darts_save.json"
-T1_COLOR = "dodgerblue"
-T2_COLOR = "blueviolet"
+T1_COLOR = "#6a83ff"
+T2_COLOR = "#ec6d00"
+RECBOARD_BG = "#323232"
 SCOREBOARD_BG = "darkolivegreen"
 INFOBOARD_BG = "white"
 SCOREBOARD_HIGHLIGHT = "olivedrab"
@@ -70,6 +71,9 @@ class DartsApp:
 
         self.canvas.bind("<Button-1>", self.click)
         self.canvas.bind("<Motion>", self.update_cursor)
+
+        self.zoom_label_canvas = tk.Canvas(root, width=100, height=60, bg=RECBOARD_BG)
+        self.zoom_label_canvas.place(x=(x-self.size)*3/4+self.size, y=x/2-self.size/2+40,anchor=tk.CENTER)
 
         self.score_canvas = tk.Canvas(root, width=x/2-self.size/2-2, height=600-2, bg=SCOREBOARD_BG)
         self.score_canvas.place(x=0, y=0)
@@ -851,6 +855,8 @@ class DartsApp:
         c.create_line(canvas_size/2-line_size/2,canvas_size/2,canvas_size/2+line_size/2,canvas_size/2,width=4,fill=T1_COLOR if self.game.active_player().name in [self.game.players[0].name] else T2_COLOR)
         c.create_line(canvas_size/2,canvas_size/2-line_size/2,canvas_size/2,canvas_size/2+line_size/2,width=4,fill=T1_COLOR if self.game.active_player().name in [self.game.players[0].name] else T2_COLOR)
 
+        number, mult = interpret_click(x,y)
+        c.create_text(canvas_size/2+75, canvas_size/2, text=f"T{number}" if mult == 3 else f"D{number}" if mult == 2 else f"{number}", fill=T1_COLOR if self.game.active_player().name in [self.game.players[0].name] else T2_COLOR, font=("Arial",40,"bold"))
 
 # -------------------------
 # Run
