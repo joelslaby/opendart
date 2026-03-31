@@ -387,7 +387,7 @@ class DartsApp:
         self.update_label()
 
     def reset(self):
-        self.save()
+        self.save_as()
         self.dart_history = []
         self.game.reset()
         self.clear_all_darts()
