@@ -7,9 +7,17 @@ import tkinter as tk
 
 def interpret_click(x, y):
 
+    size_mm = 473.2
+    score_r_mm = 170
+    dbull_r_mm = 12.7/2
+    sbull_r_mm = 32/2
+    double_r_mm = 162
+    triple_r1_mm = 107
+    triple_r2_mm = 99
+
     cx = 300
     cy = 300
-    radius = 225
+    radius = score_r_mm * 600 / size_mm
 
     dx = x - cx
     dy = y - cy
@@ -32,9 +40,9 @@ def interpret_click(x, y):
     # each wedge = 18 degrees
     index = int(angle / 18)
 
-    if dist <= 309-300:
+    if dist <= dbull_r_mm*600/size_mm:
         return 25, 2
-    elif dist <= 320-300:
+    elif dist <= sbull_r_mm*600/size_mm:
         return 25, 1
     else:
         board_numbers = [
@@ -42,10 +50,10 @@ def interpret_click(x, y):
             3,19,7,16,8,11,14,9,12,5
         ]
 
-        if 203 <= dist <= 225:
+        if double_r_mm*600/size_mm <= dist <= score_r_mm*600/size_mm:
             mult = 2
 
-        elif 127 <= dist <= 150:
+        elif triple_r2_mm*600/size_mm <= dist <= triple_r1_mm*600/size_mm:
             mult = 3
 
         else:

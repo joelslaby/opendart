@@ -38,7 +38,7 @@ class DartsApp:
 
         self.game = CricketGame()
 
-        img = Image.open("dartboard_images/dartboard.png")
+        img = Image.open("dartboard_images/dartboard_accurate.png")
         self.size = 600
         img = img.resize((self.size, self.size))
 
@@ -638,7 +638,7 @@ class DartsApp:
             canvas_size = 460
         else:
             canvas_size = 460
-        img = Image.open("dartboard_images/dartboard.png")
+        img = Image.open("dartboard_images/dartboard_accurate.png")
         img = img.resize((600, 600))
         img = img.crop((int(x-300/zoom_factor),int(y-300/zoom_factor),int(x+300/zoom_factor),int(y+300/zoom_factor)))
         img = img.resize((canvas_size,canvas_size), Image.Resampling.LANCZOS)

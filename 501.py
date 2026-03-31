@@ -56,7 +56,7 @@ class DartsApp:
         # Set the StringVar so Entry shows it
         self.folder_path_var = tk.StringVar(value=self.folder_path if self.folder_path is not None else "Save directory not set")
 
-        img = Image.open("dartboard_images/dartboard.png")
+        img = Image.open("dartboard_images/dartboard_accurate.png")
         self.size = 600
         img = img.resize((self.size, self.size))
 
@@ -71,6 +71,8 @@ class DartsApp:
         self.canvas.create_image(0,0,anchor=tk.NW,image=self.board_img)
 
         self.canvas.bind("<Button-1>", self.click)
+        self.canvas.bind("<Motion>", self.update_cursor)
+        
         self.score_canvas = tk.Canvas(root, width=x/2-self.size/2-2, height=600-2, bg=SCOREBOARD_BG)
         self.score_canvas.place(x=0, y=0)
 
@@ -986,7 +988,7 @@ class DartsApp:
             canvas_size = 460
         else:
             canvas_size = 460
-        img = Image.open("dartboard_images/dartboard.png")
+        img = Image.open("dartboard_images/dartboard_accurate.png")
         img = img.resize((600, 600))
         img = img.crop((int(x-300/zoom_factor),int(y-300/zoom_factor),int(x+300/zoom_factor),int(y+300/zoom_factor)))
         img = img.resize((canvas_size,canvas_size), Image.Resampling.LANCZOS)
