@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from dart_engine.helpers_501 import get_score_at_turn
+from dart_engine.helpers_501_1x1 import get_score_at_turn
 
 # -------------------------
 # Hit class
@@ -93,8 +93,7 @@ class Game501:
         if team.score == 0 and hit.multiplier == 2:
             print(f"{team.name} wins!")
         elif team.score <= 1:
-            team.score += hit.multiplier * hit.zone
-            team.score = get_score_at_turn(hist,self.current_team)[-2]
+            team.score = get_score_at_turn(hist,self.current_player)[-2]
             self.next_turn()
         elif self.darts_in_turn == 3:
             self.next_turn()
