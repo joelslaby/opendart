@@ -379,7 +379,7 @@ class DartsApp:
                     fill=T2_COLOR, outline=""
                 )
                 self.dart_markers_1.append(dot)
-            self.game.register_hit(Hit(hit["number"], hit["multiplier"], (hit["x"], hit["y"])))
+            self.game.register_hit(Hit(hit["number"], hit["multiplier"], (hit["x"], hit["y"])),self.dart_history)
 
             if self.game.darts_in_turn == 0:
                 self.clear_team_darts()
