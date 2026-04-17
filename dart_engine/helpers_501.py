@@ -1,88 +1,81 @@
-import numpy as np
 import csv
+from functools import lru_cache
 
-# ---------------------------
-# Display functions
-# ---------------------------
 
-def get_recommended_hits(num_darts_left,points):
+@lru_cache(maxsize=1)
+def _load_checkout_chart() -> dict[int, list[str]]:
+    chart = {}
+    with open("references/dart_out_chart.csv", newline="") as csvfile:
+        reader = csv.reader(csvfile, delimiter=",")
+        next(reader, None)
+        for row in reader:
+            score = int(row[0])
+            chart[score] = [hit for hit in row[1:4] if hit]
+    return chart
 
-    hits = []
 
-    with open('references/dart_out_chart.csv', newline='') as csvfile:
-        reader = csv.reader(csvfile, delimiter=',')
-        for nn, row in enumerate(reader):
-            if nn != 0:
-                if int(row[0]) == points:
-                    hits = row[1:4]
-                    if not hits[2]:
-                        hits = hits[:-1]
-                    if not hits[1]:
-                        hits = hits[:-1]
-                    if not hits[0]:
-                        hits = hits[:-1]
-    if num_darts_left == 1:
-        if len(hits) > 2:
-            hits = []
-    if num_darts_left == 2:
-        if len(hits) > 1:
-            hits = []
+def get_recommended_hits(num_darts_left, points):
+    hits = _load_checkout_chart().get(points, []).copy()
+    if len(hits) > num_darts_left:
+        return []
     return hits
-            
-    
 
-    
 
-# ---------------------------
-# Score calculation functions
-# ---------------------------
+def get_score_at_turn(hist, team_idx):
+    scores = [501]
+    score = 501
+    darts_in_turn = 0
 
-def get_score_at_turn(hist,team_idx):
-    scores = [0]
-    curr_team = 0
-    curr_throw = 0
-    running_score = 501
-    for hh,hit in enumerate(hist):
-        if hit["team"] != curr_team:
-            curr_team = hit["team"]
-            if curr_team == team_idx:
-                curr_throw += 1
-                scores.append(0)
-        if hit["team"] == team_idx:
-            running_score -= hit["multiplier"] * hit["number"]
-            if running_score <= 1:
-                running_score = scores[curr_throw-1]
-            scores[curr_throw] = running_score
+    for hit in hist:
+        if hit["team"] != team_idx:
+            continue
+
+        score -= hit["multiplier"] * hit["number"]
+        darts_in_turn += 1
+
+        if score <= 1:
+            score = scores[-1]
+            darts_in_turn = 3
+
+        if darts_in_turn == 3:
+            scores.append(score)
+            darts_in_turn = 0
+
+    if darts_in_turn:
+        scores.append(score)
+
     return scores
 
-def get_past_scores(hist,player_name,team_idx):
-    scores = [0]
-    player_past_scores = []
-    curr_team = 0
-    curr_throw = 0
-    curr_player_throw = -1
-    running_score = 501
-    last_player = ""
-    for hh,hit in enumerate(hist):
-        if hit["player"] == player_name and last_player != player_name:
-            curr_player_throw += 1
-            player_past_scores.append(0)
-        if hit["team"] != curr_team:
-            curr_team = hit["team"]
-            if curr_team == team_idx:
-                curr_throw += 1
-                scores.append(0)
+
+def get_past_scores(hist, player_name, team_idx):
+    past_scores = []
+    score_in_turn = 0
+    last_player = None
+    team_score = 501
+    team_turn_start = 501
+
+    for hit in hist:
+        if hit["team"] == team_idx and hit["player"] != last_player:
+            team_turn_start = team_score
+
+        if hit["player"] == player_name and hit["player"] != last_player:
+            score_in_turn = 0
+            past_scores.append(score_in_turn)
+
         if hit["team"] == team_idx:
-            running_score -= hit["multiplier"] * hit["number"]
-            if hit["player"] == player_name:
-                player_past_scores[curr_player_throw] += hit["multiplier"] * hit["number"]
-            if running_score <= 1:
-                running_score = scores[curr_throw-1]
-                if hit["player"] == player_name:
-                    player_past_scores[curr_player_throw] = 0
-            scores[curr_throw] = running_score
+            points = hit["multiplier"] * hit["number"]
+            team_score -= points
+
+            if hit["player"] == player_name and past_scores:
+                score_in_turn += points
+                past_scores[-1] = score_in_turn
+
+            if team_score <= 1:
+                team_score = team_turn_start
+                if hit["player"] == player_name and past_scores:
+                    score_in_turn = 0
+                    past_scores[-1] = score_in_turn
 
         last_player = hit["player"]
-    if not player_past_scores:
-        player_past_scores = [0]
-    return player_past_scores
+
+    return past_scores or [0]

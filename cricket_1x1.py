@@ -1,12 +1,23 @@
 import tkinter as tk
 from PIL import Image, ImageTk
-from tkinter import filedialog
-from tkinter import ttk
-import json
+from tkinter import simpledialog, ttk
 import os
-from dart_engine.params_cricket_1x1 import Hit, CricketGame, Player
+from dart_engine.params_cricket_1x1 import Hit, CricketGame
 from dart_engine.helpers_cricket_1x1 import get_game_marks_complete, cricket_marks
 from dart_engine.helpers_general import interpret_click, swap_players_history, swap_teams_history, get_screen_size_tkinter
+from dart_engine.player_ui import build_player_turn_summary, format_hit_label, get_profile_pic_path
+from dart_engine.ui_common import (
+    add_player_option,
+    ask_history_load_path,
+    ask_history_save_path,
+    choose_save_directory,
+    infer_player_turn_order,
+    load_app_config,
+    load_dart_history,
+    replay_dart_history,
+    save_dart_history,
+    update_app_config,
+)
 from datetime import datetime
 
 # -------------------------
@@ -42,15 +53,7 @@ class DartsApp:
 
         self.game = CricketGame()
 
-        # Load last folder if it exists
-        if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, "r") as f:
-                data = json.load(f)
-                self.folder_path = data.get("last_folder", None)
-                self.player_options = data.get("player_options", ['Jacob', 'Joel', 'Dustin', 'Ravi'])
-        else:
-            self.folder_path = None
-            self.player_options = ['Jacob', 'Joel', 'Dustin', 'Ravi']
+        self.folder_path, self.player_options = load_app_config(CONFIG_FILE)
 
         # Set the StringVar so Entry shows it
         self.folder_path_var = tk.StringVar(value=self.folder_path if self.folder_path is not None else "Save directory not set")
@@ -198,6 +201,49 @@ class DartsApp:
         self.draw_infoboard()
         self.draw_scoreboard()
 
+    def draw_current_dart_marker(self, x, y):
+        marker_list = self.dart_markers_0 if self.game.current_player == 0 else self.dart_markers_1
+        color = T1_COLOR if self.game.current_player == 0 else T2_COLOR
+        dot = self.canvas.create_oval(
+            x - 5,
+            y - 5,
+            x + 5,
+            y + 5,
+            fill=color,
+            outline="",
+        )
+        marker_list.append(dot)
+
+    def register_history_hit(self, hit):
+        self.game.register_hit(Hit(hit["number"], hit["multiplier"], (hit["x"], hit["y"])))
+
+    def replay_history(self):
+        replay_dart_history(
+            self.dart_history,
+            reset_game=self.game.reset,
+            clear_all_markers=self.clear_all_darts,
+            draw_marker=lambda hit: self.draw_current_dart_marker(hit["x"], hit["y"]),
+            register_hit=self.register_history_hit,
+            clear_turn_markers=self.clear_team_darts,
+            is_turn_complete=lambda: self.game.darts_in_turn == 0,
+        )
+        self.update_label()
+
+    def player_color(self, player):
+        return T1_COLOR if self.game.team_index_for_player(player) == 0 else T2_COLOR
+
+    def sync_player_vars_from_game(self):
+        self.team1a_player_var.set(self.game.players[0].name)
+        self.team1b_player_var.set(self.game.players[1].name)
+
+    def get_player_mark_history(self, player):
+        return get_game_marks_complete(self.dart_history, self.game.players, player)
+
+    def load_player_image(self, player, size):
+        original_image = Image.open(get_profile_pic_path(player.name))
+        resized_image = original_image.resize((size, size))
+        return ImageTk.PhotoImage(resized_image)
+
     def clear_team_darts(self):
         
         if self.game.current_player == 0:
@@ -220,133 +266,55 @@ class DartsApp:
         self.dart_markers_1 = []
 
     def save_setup(self):
-
-        if self.folder_path is not None:
-            initialdir = self.folder_path
-        else:
-            initialdir = os.getcwd()
-
-        self.folder_path = filedialog.askdirectory(
-            title="Select a Directory to Save",
-            initialdir=initialdir
-        )
-
-        # Check if the user cancelled the dialog
-        if not self.folder_path:
+        folder_path = choose_save_directory(self.folder_path)
+        if not folder_path:
             return
-        
-        self.folder_path_var.set(self.folder_path)
 
-        if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, "r") as f:
-                data:dict = json.load(f)
-                data.update({"last_folder": self.folder_path})
-            with open(CONFIG_FILE, "w") as f:
-                json.dump(data, f)
-        else:
-            with open(CONFIG_FILE, "w") as f:
-                json.dump({"last_folder": self.folder_path}, f)
+        self.folder_path = folder_path
+        self.folder_path_var.set(self.folder_path)
+        update_app_config(CONFIG_FILE, last_folder=self.folder_path)
 
     def save(self):
 
         self.filename = f"cricket_{self.game.players[0].name}_vs_{self.game.players[1].name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
 
-        data = {
-            "dart_history": self.dart_history
-        }
-
         if self.folder_path is None:
             self.save_as()
             return
 
-        with open(os.path.join(self.folder_path, self.filename),"w") as f:
-            json.dump(data,f,indent=2)
+        save_dart_history(os.path.join(self.folder_path, self.filename), self.dart_history)
 
         
     def save_as(self):
-        self.file_path = filedialog.asksaveasfilename(
-            defaultextension=".json",
-            filetypes=[("JSON Documents", "*.json"), ("All Files", "*.*")]
-        )
-
-        # Check if the user cancelled the dialog
-        if not self.file_path:
+        file_path = ask_history_save_path()
+        if not file_path:
             return
 
-        data = {
-            "dart_history": self.dart_history
-        }
-
-        with open(self.file_path,"w") as f:
-            json.dump(data,f,indent=2)
+        save_dart_history(file_path, self.dart_history)
 
     def load(self):
+        file_path = ask_history_load_path(self.folder_path)
+        if not file_path:
+            return
 
-        file_path = filedialog.askopenfilename(
-            title="Select a File",
-            initialdir=os.getcwd(), # Start in the current working directory
-            filetypes=(
-                ("Text files", "*.json"), 
-                ("Python files", "*.py"), 
-                ("All files", "*.*")
-            )
-        )
+        self.dart_history = load_dart_history(file_path)
+        player_order = infer_player_turn_order(self.dart_history, 2)
 
-        with open(file_path) as f:
-            data = json.load(f)
+        if player_order:
+            self.team1a_player_var.set(player_order[0])
+        if len(player_order) > 1:
+            self.team1b_player_var.set(player_order[1])
 
-        self.dart_history = data["dart_history"]
-
-        unique_players = []
-        unique_players.append(self.dart_history[0]["player"])
-        unique_players.append(self.dart_history[3]["player"])
-
-        self.team1a_player_var.set(unique_players[0])
-        self.team1b_player_var.set(unique_players[1])
-
-        for player in unique_players:
+        for player in player_order:
             if player not in self.player_options:
                 self.add_player(dialog_popup=False, name=player)
 
         self.update_team(None)
-
-        self.game.reset()
-
-        for hit in self.dart_history:
-            self.game.register_hit(Hit(hit["number"], hit["multiplier"], (hit["x"], hit["y"])))
-
-        self.update_label()
+        self.replay_history()
 
     def undo(self):
-
         self.dart_history = self.dart_history[:-1]
-
-        self.game.reset()
-
-        self.clear_all_darts()
-
-        for hit in self.dart_history:
-            # draw red dot
-            if self.game.current_player == 0:
-                dot = self.canvas.create_oval(
-                    hit["x"]-5, hit["y"]-5,
-                    hit["x"]+5, hit["y"]+5,
-                    fill=T1_COLOR, outline=""
-                )
-                self.dart_markers_0.append(dot)
-            else:
-                dot = self.canvas.create_oval(
-                    hit["x"]-5, hit["y"]-5,
-                    hit["x"]+5, hit["y"]+5,
-                    fill=T2_COLOR, outline=""
-                )
-                self.dart_markers_1.append(dot)
-            self.game.register_hit(Hit(hit["number"], hit["multiplier"], (hit["x"], hit["y"])))
-
-            if self.game.darts_in_turn == 0:
-                self.clear_team_darts()
-
-        self.update_label()
+        self.replay_history()
 
     def reset(self):
         self.save_as()
@@ -356,38 +324,25 @@ class DartsApp:
         self.update_label()
 
     def swap_players(self):
-        self.game.players[0], self.game.players[1] = self.game.players[1], self.game.players[0]
+        self.game.swap_players()
         # self.dart_history = swap_players_history(self.dart_history,0) # TODO: fix swap player history when game started???
-        self.team1a_player_var.set(self.game.players[0].name)
-        self.team1b_player_var.set(self.game.players[1].name)
+        self.sync_player_vars_from_game()
         self.update_label()
 
     def update_players(self, player):
-        self.game.players[0] = Player(self.team1a_player_var.get())
-        self.game.players[1] = Player(self.team1b_player_var.get())
+        self.game.set_player_names([self.team1a_player_var.get(), self.team1b_player_var.get()])
         self.update_label()
 
     def add_player(self, dialog_popup=True, name=None):
-        # Implementation for adding a new player
         if dialog_popup:
-            dialog = tk.simpledialog.askstring("Add Player", "Enter player name:")
-            if dialog:
-                self.player_options.append(dialog)
-        elif name:
-            self.player_options.append(name)
+            name = simpledialog.askstring("Add Player", "Enter player name:")
+
+        if not add_player_option(self.player_options, name):
+            return
 
         self.dropdown_1a['values'] = self.player_options
         self.dropdown_1b['values'] = self.player_options
-
-        if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, "r") as f:
-                data:dict = json.load(f)
-                data.update({"player_options": self.player_options})
-            with open(CONFIG_FILE, "w") as f:
-                json.dump(data, f)
-        else:
-            with open(CONFIG_FILE, "w") as f:
-                json.dump({"player_options": self.player_options}, f)
+        update_app_config(CONFIG_FILE, player_options=self.player_options)
 
     def draw_scoreboard(self):
 
@@ -401,6 +356,7 @@ class DartsApp:
         highlight_width = 140
 
         current_player_idx = self.game.current_player
+        players = self.game.players
 
         # Highlight current team
         c.create_rectangle(
@@ -414,8 +370,8 @@ class DartsApp:
 
         # Player labels
 
-        c.create_text(size_x*1/4-mid_width/4,30,text=self.game.players[0].name,font=("Arial",40,"bold"))
-        c.create_text(size_x*3/4+mid_width/4,30,text=self.game.players[1].name,font=("Arial",40,"bold"))
+        c.create_text(size_x*1/4-mid_width/4,30,text=players[0].name,font=("Arial",40,"bold"))
+        c.create_text(size_x*3/4+mid_width/4,30,text=players[1].name,font=("Arial",40,"bold"))
 
         c.create_line(0, 60, size_x, 60, fill="white", width=2)
         c.create_line(size_x/2-mid_width/2, 0, size_x/2-mid_width/2, 600, fill="white", width=2)
@@ -449,7 +405,7 @@ class DartsApp:
 
         for i,num in enumerate(CRICKET_NUMBERS):
 
-            hits = self.game.players[0].cricket_display[num] + self.game.players[0].cricket_tallies[num]
+            hits = players[0].cricket_display[num] + players[0].cricket_tallies[num]
 
             # hits = max(p.hits[num] for p in self.game.teams[0].players)
             # hits = self.team.cricket_display[num]
@@ -461,14 +417,14 @@ class DartsApp:
                 y,
                 text=cricket_marks(hits),
                 font=("Arial",30),
-                fill="darkgray" if self.game.players[0].cricket_closed[num] and self.game.players[1].cricket_closed[num] else "white"
+                fill="darkgray" if players[0].cricket_closed[num] and players[1].cricket_closed[num] else "white"
             )
 
         # Player 1 marks
 
         for i,num in enumerate(CRICKET_NUMBERS):
 
-            hits = self.game.players[1].cricket_display[num] + self.game.players[1].cricket_tallies[num]
+            hits = players[1].cricket_display[num] + players[1].cricket_tallies[num]
 
             y = start_y + i*row_height
 
@@ -477,7 +433,7 @@ class DartsApp:
                 y,
                 text=cricket_marks(hits),
                 font=("Arial",30),
-                fill="darkgray" if self.game.players[0].cricket_closed[num] and self.game.players[1].cricket_closed[num] else "white"
+                fill="darkgray" if players[0].cricket_closed[num] and players[1].cricket_closed[num] else "white"
             )
 
         # Score column
@@ -487,14 +443,14 @@ class DartsApp:
         c.create_text(
             size_x*1/4-mid_width/4,
             y,
-            text=str(self.game.players[0].score),
+            text=str(players[0].score),
             font=("Arial",30,"bold")
         )
 
         c.create_text(
             size_x*3/4+mid_width/4,
             y,
-            text=str(self.game.players[1].score),
+            text=str(players[1].score),
             font=("Arial",30,"bold")
         )
 
@@ -540,64 +496,24 @@ class DartsApp:
             x_shift += panel_width/4
         x_pos += panel_width
 
-        g = self.game
-
-        player = g.active_player()
-
-        player0 = self.game.players[0]
-        player1 = self.game.players[1]
-
-        k = [player0.name, player1.name].index(player.name)
-        player_list_orig = [player0.name, player1.name]
-        k = 2 - k
-        k %= len(player_list_orig)
-        player_list = [player0, player1]
-        player_list = player_list[-k:] + player_list[:-k]
-
-        hist = self.dart_history[::-1]
-
-        p0_hit_number = 0
-        p0_current_hits = []
-        p0_hits = []
-        p1_hit_number = 0
-        p1_hits = []
-        current_name = player_list[0].name   
-        next_player_flag = False
-        for hh,hit in enumerate(hist):
-            if hit["player"] == player_list[0].name:
-                if p0_hit_number > 2:
-                    continue
-                if hh > 2:
-                    p0_hits.append(f"{hit['number']}") if hit["multiplier"] == 1 else p0_hits.append(f"D{hit['number']}") if hit["multiplier"] == 2 else p0_hits.append(f"T{hit['number']}")
-                    p0_hit_number += 1
-                else:
-                    p0_current_hits.append(f"{hit['number']}") if hit["multiplier"] == 1 else p0_current_hits.append(f"D{hit['number']}") if hit["multiplier"] == 2 else p0_current_hits.append(f"T{hit['number']}")
-            elif hit["player"] == player_list[1].name:
-                if hh <= 2 and hist[0]["player"] == player_list[1].name:
-                    p0_current_hits.append(f"{hit['number']}") if hit["multiplier"] == 1 else p0_current_hits.append(f"D{hit['number']}") if hit["multiplier"] == 2 else p0_current_hits.append(f"T{hit['number']}")
-                    current_name = player_list[1].name
-                    next_player_flag = True
-                elif hist[0]["player"] == player_list[1].name:
-                    current_name = player_list[1].name
-                    next_player_flag = True
-                else:
-                    current_name = player_list[0].name   
-                    next_player_flag = False
-                if p1_hit_number > 2:
-                    continue
-                p1_hits.append(f"{hit['number']}") if hit["multiplier"] == 1 else p1_hits.append(f"D{hit['number']}") if hit["multiplier"] == 2 else p1_hits.append(f"T{hit['number']}")
-                p1_hit_number += 1
-
-        p0_hits = p0_hits[::-1]
-        p1_hits = p1_hits[::-1]
-        p0_current_hits = p0_current_hits[::-1]
-
-        p0_hit_sum = get_game_marks_complete(self.dart_history,[self.game.players[0],self.game.players[1]],player_list[0])[-1]
-        p1_hit_sum = get_game_marks_complete(self.dart_history,[self.game.players[0],self.game.players[1]],player_list[1])[-1]
-        
-        # Profile pictures
-        image_extensions = ('.png', '.jpg', '.jpeg', '.gif', '.bmp')
-        search_dir = "Profile_Pics"
+        player_list = self.game.rotated_turn_order()
+        turn_summary = build_player_turn_summary(
+            self.dart_history,
+            player_list,
+            self.game.active_player().name,
+        )
+        player_list = self.game.rotated_turn_order(turn_summary["focus_player"])
+        turn_summary = build_player_turn_summary(
+            self.dart_history,
+            player_list,
+            self.game.active_player().name,
+        )
+        current_name = turn_summary["focus_player"]
+        p0_current_hits = turn_summary["players"][player_list[0].name]["current_hits"]
+        p0_hits = turn_summary["players"][player_list[0].name]["previous_hits"]
+        p1_hits = turn_summary["players"][player_list[1].name]["previous_hits"]
+        p0_hit_sum = self.get_player_mark_history(player_list[0])[-1]
+        p1_hit_sum = self.get_player_mark_history(player_list[1])[-1]
 
         # Big info panel
         c.create_text(
@@ -606,7 +522,7 @@ class DartsApp:
             anchor="w",
             text=current_name,
             font=("Arial",30,"bold"),
-            fill=T1_COLOR if current_name in [self.game.players[0].name] else T2_COLOR
+            fill=self.player_color(current_name)
         )
 
         # Current throws
@@ -648,14 +564,15 @@ class DartsApp:
                 fill="black"
             )
 
-        if next_player_flag:
+        if turn_summary["next_player_flag"]:
+            next_player = self.game.active_player()
             c.create_text(
                 10,
                 140,
                 anchor="w",
-                text=f"Next player: {player_list[0].name}",
+                text=f"Next player: {next_player.name}",
                 font=("Arial",30,"bold"),
-                fill=T1_COLOR if player_list[0].name in [self.game.players[0].name] else T2_COLOR
+                fill=self.player_color(next_player)
             )
             c.create_text(
                 10,
@@ -666,25 +583,18 @@ class DartsApp:
                 fill="black"
             )
 
-        def get_profile_pic(player_index):
-            for root, _, files in os.walk(search_dir):
-                image_path = None
-                for fname in files:
-                    if player_list[player_index].name in fname and fname.lower().endswith(image_extensions):
-                        image_path = os.path.abspath(os.path.join(root, fname))
-            if image_path is None:
-                image_path = os.path.abspath(os.path.join(root, "default.png"))
-
-            return image_path
-
         # Current player panel
         c.create_text(
             width/2 + panel_width,
             12,
             text=player_list[0].name,
             font=("Arial",20,"bold"),
-            fill=T1_COLOR if player_list[0].name in [self.game.players[0].name] else T2_COLOR
+            fill=self.player_color(player_list[0])
         )
+
+        # Profile pictures
+        image_extensions = ('.png', '.jpg', '.jpeg', '.gif', '.bmp')
+        search_dir = "Profile_Pics"
 
         image_path = []
         for root, dirs, files in os.walk(search_dir):
@@ -695,9 +605,7 @@ class DartsApp:
                     full_path = os.path.abspath(os.path.join(root, fname))
                     image_path.append(full_path)
 
-        original_image = Image.open(get_profile_pic(0))
-        resized_image = original_image.resize((pfp_size,pfp_size))
-        image0 = ImageTk.PhotoImage(resized_image)
+        image0 = self.load_player_image(player_list[0], pfp_size)
         self.root.image0 = image0
         
         c.create_image(
@@ -712,7 +620,7 @@ class DartsApp:
             12+panel_height,
             text=player_list[1].name,
             font=("Arial",20,"bold"),
-            fill=T1_COLOR if player_list[1].name in [self.game.players[0].name] else T2_COLOR
+            fill=self.player_color(player_list[1])
         )
 
         image_path = []
@@ -724,9 +632,7 @@ class DartsApp:
                     full_path = os.path.abspath(os.path.join(root, fname))
                     image_path.append(full_path)
 
-        original_image = Image.open(get_profile_pic(1))
-        resized_image = original_image.resize((pfp_size,pfp_size))
-        image1 = ImageTk.PhotoImage(resized_image)
+        image1 = self.load_player_image(player_list[1], pfp_size)
         self.root.image1 = image1
         
         c.create_image(
@@ -820,7 +726,7 @@ class DartsApp:
                 if n_players > 1:
                     continue
                 
-                if hit["player"] == self.game.players[0].name:
+                if self.game.team_index_for_player(hit["player"]) == 0:
                     x0.append(hit["x"])
                     y0.append(hit["y"])
                     if hh == 5:
@@ -852,11 +758,12 @@ class DartsApp:
                 )
 
         # Center cross
-        c.create_line(canvas_size/2-line_size/2,canvas_size/2,canvas_size/2+line_size/2,canvas_size/2,width=4,fill=T1_COLOR if self.game.active_player().name in [self.game.players[0].name] else T2_COLOR)
-        c.create_line(canvas_size/2,canvas_size/2-line_size/2,canvas_size/2,canvas_size/2+line_size/2,width=4,fill=T1_COLOR if self.game.active_player().name in [self.game.players[0].name] else T2_COLOR)
+        active_color = self.player_color(self.game.active_player())
+        c.create_line(canvas_size/2-line_size/2,canvas_size/2,canvas_size/2+line_size/2,canvas_size/2,width=4,fill=active_color)
+        c.create_line(canvas_size/2,canvas_size/2-line_size/2,canvas_size/2,canvas_size/2+line_size/2,width=4,fill=active_color)
 
         number, mult = interpret_click(x,y)
-        c.create_text(canvas_size/2+75, canvas_size/2, text=f"T{number}" if mult == 3 else f"D{number}" if mult == 2 else f"{number}", fill=T1_COLOR if self.game.active_player().name in [self.game.players[0].name] else T2_COLOR, font=("Arial",40,"bold"))
+        c.create_text(canvas_size/2+75, canvas_size/2, text=format_hit_label(number, mult), fill=active_color, font=("Arial",40,"bold"))
 
 # -------------------------
 # Run
