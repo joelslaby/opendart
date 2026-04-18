@@ -131,7 +131,7 @@ class DartsApp:
             state="readonly",
             width=11,
         )
-        self.stats_view_menu.place(x=right_column_x + 10, y=stats_y+450)
+        self.stats_view_menu.place(x=right_column_x + 160, y=stats_y+450)
         self.stats_view_var.trace_add("write", self.handle_stats_view_change)
 
         btn_frame1 = tk.Frame(root)
@@ -1255,7 +1255,7 @@ class DartsApp:
         col_lefts = [outer_pad, outer_pad + col_width + gutter]
         title_y = 10
 
-        c.create_text(outer_pad, title_y, anchor="nw", text="Live Stats", font=("Arial", 19, "bold"), fill=surface_text)
+        c.create_text(width / 2, title_y, anchor="n", text="Live Stats", font=("Arial", 19, "bold"), fill=surface_text)
 
         team_box_height = 44
         player_box_height = 58
@@ -1269,6 +1269,7 @@ class DartsApp:
         for side, team in enumerate(teams):
             left = col_lefts[side]
             right = left + col_width
+            center_x = left + col_width / 2
             team_players = [player for player in players if player["side"] == side]
             team_color = T1_COLOR if side == 0 else T2_COLOR
             team_fill = STATS_PANEL if side == 0 else STATS_PANEL_ALT
@@ -1278,7 +1279,7 @@ class DartsApp:
                 y = top_y
             else:
                 c.create_rectangle(left, top_y, right, top_y + team_box_height, fill=team_fill, outline="")
-                c.create_text(left + 8, top_y + 7, anchor="nw", text=team["label"], font=("Arial", 14, "bold"), fill=team_color)
+                c.create_text(center_x, top_y + 7, anchor="n", text=team["label"], font=("Arial", 14, "bold"), fill=team_color)
                 self.draw_inline_stats(
                     c,
                     left + 8,
