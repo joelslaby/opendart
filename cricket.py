@@ -1,6 +1,7 @@
 import os
 import tkinter as tk
 from datetime import datetime
+from math import hypot
 from tkinter import simpledialog, ttk
 
 from PIL import Image, ImageTk
@@ -38,6 +39,10 @@ T2_COLOR = "#ec6d00"
 SCOREBOARD_BG = "darkolivegreen"
 INFOBOARD_BG = "white"
 SCOREBOARD_HIGHLIGHT = "olivedrab"
+STATS_BG = "#f3efe7"
+STATS_PANEL = "#e5ddd0"
+STATS_PANEL_ALT = "#ddd3c3"
+TEXT_DARK = "#2f2419"
 
 
 class DartsApp:
@@ -65,17 +70,23 @@ class DartsApp:
         self.screen_height = root.winfo_screenheight()
         self.profile_image_cache = {}
         self.infoboard_turn_summary = None
+        self.stats_cache = {}
+        self.stats_board_photos = {}
 
         self.canvas = tk.Canvas(root, width=self.size, height=self.size)
         self.canvas.pack()
 
+        right_column_width = self.screen_width / 2 - self.size / 2 - 2
+        right_column_x = self.screen_width / 2 + self.size / 2 - 3
+        zoom_height = right_column_width
+
         self.canvas_zoom = tk.Canvas(
             root,
-            width=x / 2 - self.size / 2 - 2,
-            height=x / 2 - self.size / 2 - 2,
+            width=right_column_width,
+            height=zoom_height,
             bg="white",
         )
-        self.canvas_zoom.place(x=x / 2 + self.size / 2 - 3, y=0)
+        self.canvas_zoom.place(x=right_column_x, y=0)
         self.canvas.create_image(0, 0, anchor=tk.NW, image=self.board_img)
 
         self.cursor_label = tk.Label(root, text="x: 0  y: 0", font=("Arial", 10))
@@ -94,6 +105,17 @@ class DartsApp:
 
         self.info_canvas = tk.Canvas(root, width=self.size - 7, height=y - 600 - 4, bg=INFOBOARD_BG)
         self.info_canvas.place(x=x / 2 - self.size / 2 + 1, y=600)
+
+        stats_y = int(zoom_height) + 2
+        stats_height = self.screen_height - stats_y - 2
+        self.stats_canvas = tk.Canvas(
+            root,
+            width=right_column_width,
+            height=stats_height,
+            bg=INFOBOARD_BG,
+            highlightthickness=0,
+        )
+        self.stats_canvas.place(x=right_column_x, y=stats_y)
 
         btn_frame1 = tk.Frame(root)
         btn_frame1.place(x=5, y=630)
@@ -269,7 +291,7 @@ class DartsApp:
         self.sync_player_vars_from_game()
         self.update_mode_controls()
         self.clear_all_darts()
-        self.update_mark_history_cache()
+        self.refresh_caches()
         self.update_label()
 
     def handle_mode_change(self, *_):
@@ -318,7 +340,7 @@ class DartsApp:
         if self.game.darts_in_turn == 0:
             self.clear_team_darts()
 
-        self.update_mark_history_cache()
+        self.refresh_caches()
         self.update_label()
         self.draw_zoomboard(event.x, event.y)
 
@@ -326,6 +348,7 @@ class DartsApp:
         self.update_infoboard_turn_summary()
         self.draw_infoboard()
         self.draw_scoreboard()
+        self.draw_statsboard()
 
     def draw_current_dart_marker(self, x, y):
         marker_list = self.dart_markers_0 if self.active_side() == 0 else self.dart_markers_1
@@ -353,7 +376,7 @@ class DartsApp:
             clear_turn_markers=self.clear_team_darts,
             is_turn_complete=lambda: self.game.darts_in_turn == 0,
         )
-        self.update_mark_history_cache()
+        self.refresh_caches()
         self.update_label()
 
     def player_color(self, player):
@@ -363,6 +386,50 @@ class DartsApp:
         if self.is_solo_mode():
             return ""
         return self.game.team_for_player(player).name
+
+    def stats_players_in_display_order(self):
+        if self.is_solo_mode():
+            return list(self.game.players)
+        return [player for team in self.game.teams for player in team.players]
+
+    def team_player_colors(self, side, count):
+        palettes = {
+            0: ["#6a83ff", "#2f52d6", "#94a6ff", "#4c66ff"],
+            1: ["#ec6d00", "#b24a00", "#ff9b45", "#d85c00"],
+        }
+        palette = palettes[side]
+        return [palette[index % len(palette)] for index in range(max(1, count))]
+
+    def previous_turn_grouping(self, turn_hits):
+        if len(turn_hits) < 2:
+            return 0.0
+        center_x = sum(hit["x"] for hit in turn_hits) / len(turn_hits)
+        center_y = sum(hit["y"] for hit in turn_hits) / len(turn_hits)
+        return sum(hypot(hit["x"] - center_x, hit["y"] - center_y) for hit in turn_hits) / len(turn_hits)
+
+    def draw_inline_stats(self, canvas, x, y, stats, label_font, value_font, color=TEXT_DARK, gap=10):
+        cursor_x = x
+        for label, value in stats:
+            label_id = canvas.create_text(
+                cursor_x,
+                y,
+                anchor="nw",
+                text=label,
+                font=label_font,
+                fill=color,
+            )
+            bbox = canvas.bbox(label_id)
+            cursor_x = (bbox[2] if bbox else cursor_x) + 3
+            value_id = canvas.create_text(
+                cursor_x,
+                y,
+                anchor="nw",
+                text=str(value),
+                font=value_font,
+                fill=color,
+            )
+            bbox = canvas.bbox(value_id)
+            cursor_x = (bbox[2] if bbox else cursor_x) + gap
 
     def get_player_mark_history(self, player):
         player_name = player.name if hasattr(player, "name") else player
@@ -384,12 +451,142 @@ class DartsApp:
             complete_turns_only=True,
         )
 
+    def update_stats_cache(self):
+        players = self.stats_players_in_display_order()
+        player_stats = {
+            player.name: {
+                "name": player.name,
+                "side": self.game.team_index_for_player(player),
+                "darts": 0,
+                "marks": 0,
+                "scoring_hits": 0,
+                "bulls": 0,
+                "triples": 0,
+                "points": 0,
+                "previous_grouping": 0.0,
+            }
+            for player in players
+        }
+
+        team_labels = (
+            [self.game.players[0].name, self.game.players[1].name]
+            if self.is_solo_mode()
+            else [self.game.teams[0].name, self.game.teams[1].name]
+        )
+        team_stats = {
+            side: {
+                "label": team_labels[side],
+                "darts": 0,
+                "marks": 0,
+                "scoring_hits": 0,
+                "bulls": 0,
+                "triples": 0,
+            }
+            for side in (0, 1)
+        }
+
+        team_players = {0: [], 1: []}
+        for player in players:
+            side = self.game.team_index_for_player(player)
+            team_players[side].append(player.name)
+
+        player_color_lookup = {}
+        for side in (0, 1):
+            for name, color in zip(team_players[side], self.team_player_colors(side, len(team_players[side]))):
+                player_color_lookup[name] = color
+
+        distribution_points = {0: [], 1: []}
+        completed_turns = {player.name: [] for player in players}
+        current_turn_player = None
+        current_turn_hits = []
+        team_remaining = {
+            0: {number: 3 for number in CRICKET_NUMBERS},
+            1: {number: 3 for number in CRICKET_NUMBERS},
+        }
+        for hit in self.dart_history:
+            player_name = hit["player"]
+            side = hit.get("team", 0)
+            number = hit["number"]
+            multiplier = hit["multiplier"]
+            marks = multiplier if number in CRICKET_NUMBERS else 0
+
+            if player_name != current_turn_player:
+                if current_turn_player in completed_turns and len(current_turn_hits) == 3:
+                    completed_turns[current_turn_player].append(current_turn_hits)
+                current_turn_player = player_name
+                current_turn_hits = []
+            current_turn_hits.append(hit)
+
+            if player_name in player_stats:
+                player_stats[player_name]["darts"] += 1
+                player_stats[player_name]["marks"] += marks
+                player_stats[player_name]["scoring_hits"] += 1 if marks else 0
+                player_stats[player_name]["bulls"] += 1 if number == 25 else 0
+                player_stats[player_name]["triples"] += 1 if multiplier == 3 else 0
+
+                if number in CRICKET_NUMBERS:
+                    opponent = 1 - side
+                    hits_remaining = team_remaining[side][number]
+                    overflow_hits = max(0, multiplier - hits_remaining)
+                    if hits_remaining > 0:
+                        team_remaining[side][number] -= min(multiplier, hits_remaining)
+                    if team_remaining[side][number] == 0 and team_remaining[opponent][number] > 0:
+                        player_stats[player_name]["points"] += overflow_hits * number
+
+            team_stats[side]["darts"] += 1
+            team_stats[side]["marks"] += marks
+            team_stats[side]["scoring_hits"] += 1 if marks else 0
+            team_stats[side]["bulls"] += 1 if number == 25 else 0
+            team_stats[side]["triples"] += 1 if multiplier == 3 else 0
+            distribution_points[side].append(
+                {
+                    "x": hit["x"],
+                    "y": hit["y"],
+                    "player": player_name,
+                    "color": player_color_lookup.get(player_name, T1_COLOR if side == 0 else T2_COLOR),
+                }
+            )
+
+        if current_turn_player in completed_turns and len(current_turn_hits) == 3:
+            completed_turns[current_turn_player].append(current_turn_hits)
+
+        for stats in player_stats.values():
+            stats["mpr"] = (stats["marks"] * 3 / stats["darts"]) if stats["darts"] else 0.0
+            stats["hit_rate"] = (stats["scoring_hits"] / stats["darts"] * 100) if stats["darts"] else 0.0
+            turns = completed_turns.get(stats["name"], [])
+            stats["previous_grouping"] = self.previous_turn_grouping(turns[-1]) if turns else 0.0
+
+        for side in (0, 1):
+            team_stats[side]["mpr"] = (
+                team_stats[side]["marks"] * 3 / team_stats[side]["darts"]
+                if team_stats[side]["darts"]
+                else 0.0
+            )
+            team_stats[side]["hit_rate"] = (
+                team_stats[side]["scoring_hits"] / team_stats[side]["darts"] * 100
+                if team_stats[side]["darts"]
+                else 0.0
+            )
+
+        self.stats_cache = {
+            "players": [player_stats[player.name] for player in players],
+            "teams": [team_stats[0], team_stats[1]],
+            "distribution": distribution_points,
+            "team_players": team_players,
+            "player_colors": player_color_lookup,
+            "active_player": self.game.active_player().name,
+        }
+
     def update_infoboard_turn_summary(self):
         self.infoboard_turn_summary = build_recent_player_turn_summary(
             self.dart_history,
             self.game.rotated_turn_order(),
             self.game.active_player().name,
         )
+
+    def refresh_caches(self):
+        self.update_mark_history_cache()
+        self.update_stats_cache()
 
     def previous_turn_mark_sum(self, player, end_of_turn):
         mark_history = self.get_player_mark_history(player)
@@ -504,7 +701,7 @@ class DartsApp:
         self.dart_history = []
         self.game.reset()
         self.clear_all_darts()
-        self.update_mark_history_cache()
+        self.refresh_caches()
         self.update_label()
 
     def swap_teams(self):
@@ -514,7 +711,7 @@ class DartsApp:
             self.game.swap_teams()
             self.dart_history = swap_teams_history(self.dart_history)
         self.sync_player_vars_from_game()
-        self.update_mark_history_cache()
+        self.refresh_caches()
         self.update_label()
 
     def swap_team_players(self, team_index):
@@ -523,12 +720,12 @@ class DartsApp:
         self.game.swap_team_players(team_index)
         self.dart_history = swap_players_history(self.dart_history, team_index)
         self.sync_player_vars_from_game()
-        self.update_mark_history_cache()
+        self.refresh_caches()
         self.update_label()
 
     def update_players(self, _event):
         self.apply_player_vars_to_game()
-        self.update_mark_history_cache()
+        self.refresh_caches()
         self.update_label()
 
     def add_player(self, dialog_popup=True, name=None):
@@ -885,6 +1082,125 @@ class DartsApp:
         number, mult = interpret_click(x, y)
         c.create_text(canvas_size / 2 + 75, canvas_size / 2, text=format_hit_label(number, mult), fill=active_color, font=("Arial", 40, "bold"))
 
+    def draw_statsboard(self):
+        c = self.stats_canvas
+        c.delete("all")
+
+        width = max(int(c.winfo_width()), int(float(c["width"])))
+        height = max(int(c.winfo_height()), int(float(c["height"])))
+        if width <= 24 or height <= 24:
+            return
+
+        players = self.stats_cache.get("players", [])
+        teams = self.stats_cache.get("teams", [])
+        distribution = self.stats_cache.get("distribution", {0: [], 1: []})
+        player_colors = self.stats_cache.get("player_colors", {})
+        active_player = self.stats_cache.get("active_player", "")
+
+        outer_pad = 10
+        gutter = 8
+        col_width = max(1, (width - outer_pad * 2 - gutter) / 2)
+        col_lefts = [outer_pad, outer_pad + col_width + gutter]
+        title_y = 10
+
+        c.create_text(outer_pad, title_y, anchor="nw", text="Live Stats", font=("Arial", 19, "bold"), fill=TEXT_DARK)
+
+        team_box_height = 44
+        player_box_height = 58
+        player_gap = 2
+        section_gap = 6
+        board_title_gap = 20
+        board_gap = 6
+        board_bottom_pad = 10
+        top_y = title_y + 26
+
+        for side, team in enumerate(teams):
+            left = col_lefts[side]
+            right = left + col_width
+            team_players = [player for player in players if player["side"] == side]
+            team_color = T1_COLOR if side == 0 else T2_COLOR
+            team_fill = STATS_PANEL if side == 0 else STATS_PANEL_ALT
+
+            c.create_rectangle(left, top_y, right, top_y + team_box_height, fill=team_fill, outline="")
+            c.create_text(left + 8, top_y + 7, anchor="nw", text=team["label"], font=("Arial", 14, "bold"), fill=team_color)
+            self.draw_inline_stats(
+                c,
+                left + 8,
+                top_y + 24,
+                [
+                    ("M", team["marks"]),
+                    ("MPR", f"{team['mpr']:.2f}"),
+                    ("hit", f"{team['hit_rate']:.0f}%"),
+                    ("B", team["bulls"]),
+                    ("T", team["triples"]),
+                ],
+                ("Arial", 10, "bold"),
+                ("Arial", 10),
+            )
+
+            y = top_y + team_box_height + 3
+            for player in team_players:
+                c.create_rectangle(left, y, right, y + player_box_height, fill=STATS_BG, outline="")
+                c.create_text(
+                    left + 8,
+                    y + 7,
+                    anchor="nw",
+                    text=player["name"],
+                    font=("Arial", 12, "bold"),
+                    fill=player_colors.get(player["name"], team_color),
+                )
+                if player["name"] == active_player:
+                    badge_w = 42
+                    c.create_rectangle(right - badge_w - 8, y + 7, right - 8, y + 21, fill=SCOREBOARD_HIGHLIGHT, outline="")
+                    c.create_text(right - badge_w / 2 - 8, y + 14, text="LIVE", font=("Arial", 8, "bold"), fill="white")
+                self.draw_inline_stats(
+                    c,
+                    left + 8,
+                    y + 24,
+                    [
+                        ("dt", player["darts"]),
+                        ("M", player["marks"]),
+                        ("MPR", f"{player['mpr']:.2f}"),
+                        ("hit", f"{player['hit_rate']:.0f}%"),
+                    ],
+                    ("Arial", 9, "bold"),
+                    ("Arial", 9),
+                )
+                self.draw_inline_stats(
+                    c,
+                    left + 8,
+                    y + 39,
+                    [
+                        ("B", player["bulls"]),
+                        ("T", player["triples"]),
+                        ("Pts", player["points"]),
+                        ("Grp", f"{player['previous_grouping']:.1f}"),
+                    ],
+                    ("Arial", 9, "bold"),
+                    ("Arial", 9),
+                )
+                y += player_box_height + player_gap
+
+            c.create_text(left, y + section_gap, anchor="nw", text="Shot Map", font=("Arial", 12, "bold"), fill=TEXT_DARK)
+            board_y = y + section_gap + board_title_gap
+            available_board_height = max(1, height - board_y - board_bottom_pad)
+            board_size = int(max(1, min(col_width, available_board_height)))
+            board_img = self.zoom_source_img.resize((board_size, board_size), Image.Resampling.LANCZOS)
+            self.stats_board_photos[side] = ImageTk.PhotoImage(board_img)
+            c.create_image(left, board_y, anchor=tk.NW, image=self.stats_board_photos[side])
+
+            for hit in distribution.get(side, []):
+                dot_x = left + hit["x"] / 600 * board_size
+                dot_y = board_y + hit["y"] / 600 * board_size
+                c.create_oval(dot_x - 2, dot_y - 2, dot_x + 2, dot_y + 2, fill=hit["color"], outline="")
+
+            legend_y = board_y + board_size + board_gap
+            legend_x = left
+            for player in team_players:
+                color = player_colors.get(player["name"], team_color)
+                c.create_oval(legend_x, legend_y + 2, legend_x + 8, legend_y + 10, fill=color, outline="")
+                c.create_text(legend_x + 12, legend_y, anchor="nw", text=player["name"], font=("Arial", 9, "bold"), fill=TEXT_DARK)
+                legend_x += max(48, 16 + len(player["name"]) * 7)
 
 root = tk.Tk()
 app = DartsApp(root)
