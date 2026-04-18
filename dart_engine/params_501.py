@@ -122,7 +122,7 @@ class Game501:
         self.darts_in_turn += 1
 
         if team.score == 0 and hit.multiplier == 2:
-            print(f"{team.name} wins!")
+            self.winner = team.name
             return
 
         if team.score <= 1:
@@ -138,6 +138,7 @@ class Game501:
         self.current_team = 0
         self.current_player = 0
         self.darts_in_turn = 0
+        self.winner = None
 
         for team in self.teams:
             team.score = 501

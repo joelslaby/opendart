@@ -125,6 +125,17 @@ class CricketGame:
                 return player
         return None
 
+    def team_has_closed(self, team):
+        return all(team.cricket_closed[number] for number in CRICKET_NUMBERS)
+
+    def check_winner(self):
+        for index, team in enumerate(self.teams):
+            opponent = self.teams[1 - index]
+            if self.team_has_closed(team) and team.score >= opponent.score:
+                self.winner = team.name
+                return self.winner
+        return None
+
     def next_turn(self):
         self.darts_in_turn = 0
         self.next_player = (self.next_player + 1) % 4
@@ -141,6 +152,10 @@ class CricketGame:
             team.cricket_tallies[hit.zone] += hits_over
             team.score += hits_over * hit.zone
 
+        self.check_winner()
+        if self.winner:
+            return
+
         self.darts_in_turn += 1
         if self.darts_in_turn == 3:
             self.next_turn()
@@ -150,6 +165,7 @@ class CricketGame:
         self.current_team = 0
         self.current_player = 0
         self.darts_in_turn = 0
+        self.winner = None
 
         for team in self.teams:
             team.reset()

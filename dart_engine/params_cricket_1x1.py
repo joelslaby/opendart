@@ -85,6 +85,17 @@ class CricketGame:
     def swap_players(self):
         self.players[0], self.players[1] = self.players[1], self.players[0]
 
+    def player_has_closed(self, player):
+        return all(player.cricket_closed[number] for number in CRICKET_NUMBERS)
+
+    def check_winner(self):
+        for index, player in enumerate(self.players):
+            opponent = self.players[1 - index]
+            if self.player_has_closed(player) and player.score >= opponent.score:
+                self.winner = player.name
+                return self.winner
+        return None
+
     def next_turn(self):
         self.darts_in_turn = 0
         self.next_player = (self.next_player + 1) % 2
@@ -99,6 +110,10 @@ class CricketGame:
             player.cricket_tallies[hit.zone] += hits_over
             player.score += hits_over * hit.zone
 
+        self.check_winner()
+        if self.winner:
+            return
+
         self.darts_in_turn += 1
         if self.darts_in_turn == 3:
             self.next_turn()
@@ -107,6 +122,7 @@ class CricketGame:
         self.next_player = 0
         self.current_player = 0
         self.darts_in_turn = 0
+        self.winner = None
 
         for player in self.players:
             player.reset()

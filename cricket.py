@@ -2,7 +2,7 @@ import os
 import tkinter as tk
 from datetime import datetime
 from math import ceil, hypot
-from tkinter import simpledialog, ttk
+from tkinter import messagebox, simpledialog, ttk
 
 from PIL import Image, ImageTk
 os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib-codex")
@@ -78,6 +78,7 @@ class DartsApp:
         self.stats_cache = {}
         self.stats_board_photos = {}
         self.stats_view_var = tk.StringVar(value="Shot Map")
+        self.winner_dialog_shown = False
 
         self.canvas = tk.Canvas(root, width=self.size, height=self.size)
         self.canvas.pack()
@@ -325,6 +326,9 @@ class DartsApp:
         self.draw_zoomboard(event.x, event.y)
 
     def click(self, event):
+        if self.game.winner:
+            return
+
         number, mult = interpret_click(event.x, event.y)
         if number is None:
             return
@@ -359,6 +363,7 @@ class DartsApp:
 
         self.refresh_caches()
         self.update_label()
+        self.prompt_save_on_winner()
         self.draw_zoomboard(event.x, event.y)
 
     def update_label(self):
@@ -395,6 +400,7 @@ class DartsApp:
         )
         self.refresh_caches()
         self.update_label()
+        self.winner_dialog_shown = False
 
     def player_color(self, player):
         return T1_COLOR if self.game.team_index_for_player(player) == 0 else T2_COLOR
@@ -782,6 +788,14 @@ class DartsApp:
         self.dart_markers_0 = []
         self.dart_markers_1 = []
 
+    def prompt_save_on_winner(self):
+        if not self.game.winner or self.winner_dialog_shown:
+            return
+        self.winner_dialog_shown = True
+        should_save = messagebox.askyesno("Game Over", f"{self.game.winner} wins!\n\nDo you want to save this game?")
+        if should_save:
+            self.save()
+
     def save_setup(self):
         folder_path = choose_save_directory(self.folder_path)
         if not folder_path:
@@ -838,10 +852,12 @@ class DartsApp:
 
         self.apply_player_vars_to_game()
         self.replay_history()
+        self.winner_dialog_shown = False
 
     def undo(self):
         self.dart_history = self.dart_history[:-1]
         self.replay_history()
+        self.winner_dialog_shown = False
 
     def reset(self):
         self.save_as()
@@ -850,6 +866,7 @@ class DartsApp:
         self.clear_all_darts()
         self.refresh_caches()
         self.update_label()
+        self.winner_dialog_shown = False
 
     def swap_teams(self):
         if self.is_solo_mode():
@@ -860,6 +877,7 @@ class DartsApp:
         self.sync_player_vars_from_game()
         self.refresh_caches()
         self.update_label()
+        self.winner_dialog_shown = False
 
     def swap_team_players(self, team_index):
         if self.is_solo_mode():
@@ -869,11 +887,13 @@ class DartsApp:
         self.sync_player_vars_from_game()
         self.refresh_caches()
         self.update_label()
+        self.winner_dialog_shown = False
 
     def update_players(self, _event):
         self.apply_player_vars_to_game()
         self.refresh_caches()
         self.update_label()
+        self.winner_dialog_shown = False
 
     def add_player(self, dialog_popup=True, name=None):
         if dialog_popup:
