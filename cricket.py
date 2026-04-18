@@ -17,7 +17,7 @@ from dart_engine.params_cricket import CricketGame as TeamCricketGame
 from dart_engine.params_cricket import Hit as TeamHit
 from dart_engine.params_cricket_1x1 import CricketGame as SoloCricketGame
 from dart_engine.params_cricket_1x1 import Hit as SoloHit
-from dart_engine.player_ui import build_player_turn_summary, format_hit_label, get_profile_pic_path
+from dart_engine.player_ui import build_recent_player_turn_summary, format_hit_label, get_profile_pic_path
 from dart_engine.ui_common import (
     add_player_option,
     ask_history_load_path,
@@ -60,6 +60,11 @@ class DartsApp:
         self.size = 600
         img = img.resize((self.size, self.size))
         self.board_img = ImageTk.PhotoImage(img)
+        self.zoom_source_img = img
+        self.screen_width = root.winfo_screenwidth()
+        self.screen_height = root.winfo_screenheight()
+        self.profile_image_cache = {}
+        self.infoboard_turn_summary = None
 
         self.canvas = tk.Canvas(root, width=self.size, height=self.size)
         self.canvas.pack()
@@ -318,6 +323,7 @@ class DartsApp:
         self.draw_zoomboard(event.x, event.y)
 
     def update_label(self):
+        self.update_infoboard_turn_summary()
         self.draw_infoboard()
         self.draw_scoreboard()
 
@@ -378,6 +384,13 @@ class DartsApp:
             complete_turns_only=True,
         )
 
+    def update_infoboard_turn_summary(self):
+        self.infoboard_turn_summary = build_recent_player_turn_summary(
+            self.dart_history,
+            self.game.rotated_turn_order(),
+            self.game.active_player().name,
+        )
+
     def previous_turn_mark_sum(self, player, end_of_turn):
         mark_history = self.get_player_mark_history(player)
         if end_of_turn:
@@ -401,8 +414,11 @@ class DartsApp:
         return mark_history[-1]
 
     def load_player_image(self, player, size):
-        image = Image.open(get_profile_pic_path(player.name))
-        return ImageTk.PhotoImage(image.resize((size, size)))
+        cache_key = (player.name, size)
+        if cache_key not in self.profile_image_cache:
+            image = Image.open(get_profile_pic_path(player.name))
+            self.profile_image_cache[cache_key] = ImageTk.PhotoImage(image.resize((size, size)))
+        return self.profile_image_cache[cache_key]
 
     def clear_team_darts(self):
         if self.active_side() == 0:
@@ -651,9 +667,8 @@ class DartsApp:
     def infoboard_layout(self):
         width = 600
         panel_width = int(width / 3)
-        screen_width, _ = get_screen_size_tkinter()
-        panel_height = 162 if screen_width == 1470 else 174
-        pfp_size = 98 if screen_width == 1470 else 100
+        panel_height = 162 if self.screen_width == 1470 else 174
+        pfp_size = 98 if self.screen_width == 1470 else 100
         return width, panel_width, panel_height, pfp_size, 40
 
     def draw_infoboard_teams(self):
@@ -684,7 +699,7 @@ class DartsApp:
             x_shift += panel_width / 4
 
         panel_player_list = self.game.rotated_turn_order()
-        turn_summary = build_player_turn_summary(self.dart_history, panel_player_list, self.game.active_player().name)
+        turn_summary = self.infoboard_turn_summary
         current_name = turn_summary["focus_player"]
         current_team = self.team_name_for_player(current_name)
         p0_current_hits = turn_summary["players"][current_name]["current_hits"]
@@ -771,7 +786,7 @@ class DartsApp:
             x_shift += panel_width / 4
 
         panel_player_list = self.game.rotated_turn_order()
-        turn_summary = build_player_turn_summary(self.dart_history, panel_player_list, self.game.active_player().name)
+        turn_summary = self.infoboard_turn_summary
         current_name = turn_summary["focus_player"]
         p0_current_hits = turn_summary["players"][current_name]["current_hits"]
         p0_hits = self.panel_turn_hits(panel_player_list[0], turn_summary)
@@ -829,8 +844,7 @@ class DartsApp:
         zoom_factor = 3
         line_size = 50
         canvas_size = 460
-        img = Image.open("dartboard_images/dartboard_accurate.png")
-        img = img.resize((600, 600))
+        img = self.zoom_source_img.copy()
         img = img.crop((int(x - 300 / zoom_factor), int(y - 300 / zoom_factor), int(x + 300 / zoom_factor), int(y + 300 / zoom_factor)))
         img = img.resize((canvas_size, canvas_size), Image.Resampling.LANCZOS)
         self.zoom_img = ImageTk.PhotoImage(img)

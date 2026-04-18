@@ -72,3 +72,62 @@ def build_player_turn_summary(dart_history, players_in_order, active_player_name
         "next_player_flag": next_player_flag,
         "players": summary,
     }
+
+
+def build_recent_player_turn_summary(dart_history, players_in_order, active_player_name, turns_per_player=2):
+    player_names = [player.name for player in players_in_order]
+    turns_by_player = {name: [] for name in player_names}
+
+    if not dart_history:
+        return {
+            "focus_player": active_player_name,
+            "next_player_flag": False,
+            "players": {
+                name: {"current_hits": [], "previous_hits": []}
+                for name in player_names
+            },
+        }
+
+    last_turn_player = dart_history[-1]["player"]
+    current_player = None
+    current_turn = []
+
+    for hit in reversed(dart_history):
+        hit_player = hit["player"]
+        if hit_player != current_player:
+            if current_player in turns_by_player and len(turns_by_player[current_player]) < turns_per_player:
+                turns_by_player[current_player].append(list(reversed(current_turn)))
+            current_player = hit_player
+            current_turn = []
+
+            if all(len(turns) >= turns_per_player for turns in turns_by_player.values()):
+                break
+
+        current_turn.append(format_hit_label(hit["number"], hit["multiplier"]))
+
+    if current_player in turns_by_player and len(turns_by_player[current_player]) < turns_per_player:
+        turns_by_player[current_player].append(list(reversed(current_turn)))
+
+    focus_player = last_turn_player if last_turn_player != active_player_name else active_player_name
+    next_player_flag = last_turn_player != active_player_name
+
+    summary = {}
+    for name in player_names:
+        turns = turns_by_player[name]
+        if name == focus_player:
+            current_hits = turns[0] if turns else []
+            previous_hits = turns[1] if len(turns) > 1 else []
+        else:
+            current_hits = []
+            previous_hits = turns[0] if turns else []
+
+        summary[name] = {
+            "current_hits": current_hits,
+            "previous_hits": previous_hits,
+        }
+
+    return {
+        "focus_player": focus_player,
+        "next_player_flag": next_player_flag,
+        "players": summary,
+    }
