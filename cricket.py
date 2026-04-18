@@ -384,6 +384,22 @@ class DartsApp:
             return mark_history[-2] if len(mark_history) > 1 else 0
         return mark_history[-1]
 
+    def panel_turn_hits(self, player, turn_summary):
+        player_name = player.name if hasattr(player, "name") else player
+        player_summary = turn_summary["players"][player_name]
+        if turn_summary["next_player_flag"] and player_name == turn_summary["focus_player"]:
+            return player_summary["current_hits"]
+        return player_summary["previous_hits"]
+
+    def panel_mark_sum(self, player, turn_summary):
+        player_name = player.name if hasattr(player, "name") else player
+        mark_history = self.get_player_mark_history(player)
+        if turn_summary["next_player_flag"] and player_name == turn_summary["focus_player"]:
+            return mark_history[-1]
+        if player_name == turn_summary["focus_player"]:
+            return mark_history[-2] if len(mark_history) > 1 else 0
+        return mark_history[-1]
+
     def load_player_image(self, player, size):
         image = Image.open(get_profile_pic_path(player.name))
         return ImageTk.PhotoImage(image.resize((size, size)))
@@ -667,24 +683,20 @@ class DartsApp:
             c.create_line(x_pos + x_shift, y_pos + box_height, x_pos + x_shift, y_pos, fill="black", width=2)
             x_shift += panel_width / 4
 
-        player_list = self.game.rotated_turn_order()
-        turn_summary = build_player_turn_summary(self.dart_history, player_list, self.game.active_player().name)
-        player_list = self.game.rotated_turn_order(turn_summary["focus_player"])
-        turn_summary = build_player_turn_summary(self.dart_history, player_list, self.game.active_player().name)
-
+        panel_player_list = self.game.rotated_turn_order()
+        turn_summary = build_player_turn_summary(self.dart_history, panel_player_list, self.game.active_player().name)
         current_name = turn_summary["focus_player"]
         current_team = self.team_name_for_player(current_name)
-        p0_current_hits = turn_summary["players"][player_list[0].name]["current_hits"]
-        p0_hits = turn_summary["players"][player_list[0].name]["previous_hits"]
-        p1_hits = turn_summary["players"][player_list[1].name]["previous_hits"]
-        p2_hits = turn_summary["players"][player_list[2].name]["previous_hits"]
-        p3_hits = turn_summary["players"][player_list[3].name]["previous_hits"]
-        print(turn_summary)
+        p0_current_hits = turn_summary["players"][current_name]["current_hits"]
+        p0_hits = self.panel_turn_hits(panel_player_list[0], turn_summary)
+        p1_hits = self.panel_turn_hits(panel_player_list[1], turn_summary)
+        p2_hits = self.panel_turn_hits(panel_player_list[2], turn_summary)
+        p3_hits = self.panel_turn_hits(panel_player_list[3], turn_summary)
         mark_sums = [
-            self.previous_turn_mark_sum(player_list[0], turn_summary['next_player_flag']),
-            self.previous_turn_mark_sum(player_list[1], False),
-            self.previous_turn_mark_sum(player_list[2], False),
-            self.previous_turn_mark_sum(player_list[3], False),
+            self.panel_mark_sum(panel_player_list[0], turn_summary),
+            self.panel_mark_sum(panel_player_list[1], turn_summary),
+            self.panel_mark_sum(panel_player_list[2], turn_summary),
+            self.panel_mark_sum(panel_player_list[3], turn_summary),
         ]
 
         c.create_text(10, 20, anchor="w", text=current_name, font=("Arial", 30, "bold"), fill=self.player_color(current_name))
@@ -718,7 +730,7 @@ class DartsApp:
             (width / 2, 12 + panel_height, 72 + panel_height),
             (width / 2 + panel_width, 12 + panel_height, 72 + panel_height),
         ]
-        for index, player in enumerate(player_list):
+        for index, player in enumerate(panel_player_list):
             x_text, y_text, y_img = image_positions[index]
             c.create_text(x_text, y_text, text=player.name, font=("Arial", 20, "bold"), fill=self.player_color(player))
             image = self.load_player_image(player, pfp_size)
@@ -758,18 +770,15 @@ class DartsApp:
             c.create_line(x_pos + x_shift, y_pos + box_height, x_pos + x_shift, y_pos, fill="black", width=2)
             x_shift += panel_width / 4
 
-        player_list = self.game.rotated_turn_order()
-        turn_summary = build_player_turn_summary(self.dart_history, player_list, self.game.active_player().name)
-        player_list = self.game.rotated_turn_order(turn_summary["focus_player"])
-        turn_summary = build_player_turn_summary(self.dart_history, player_list, self.game.active_player().name)
-
+        panel_player_list = self.game.rotated_turn_order()
+        turn_summary = build_player_turn_summary(self.dart_history, panel_player_list, self.game.active_player().name)
         current_name = turn_summary["focus_player"]
-        p0_current_hits = turn_summary["players"][player_list[0].name]["current_hits"]
-        p0_hits = turn_summary["players"][player_list[0].name]["previous_hits"]
-        p1_hits = turn_summary["players"][player_list[1].name]["previous_hits"]
+        p0_current_hits = turn_summary["players"][current_name]["current_hits"]
+        p0_hits = self.panel_turn_hits(panel_player_list[0], turn_summary)
+        p1_hits = self.panel_turn_hits(panel_player_list[1], turn_summary)
         mark_sums = [
-            self.previous_turn_mark_sum(player_list[0], True),
-            self.previous_turn_mark_sum(player_list[1], False),
+            self.panel_mark_sum(panel_player_list[0], turn_summary),
+            self.panel_mark_sum(panel_player_list[1], turn_summary),
         ]
 
         c.create_text(10, 20, anchor="w", text=current_name, font=("Arial", 30, "bold"), fill=self.player_color(current_name))
@@ -797,7 +806,7 @@ class DartsApp:
             (width / 2 + panel_width, 12, 72),
             (width / 2 + panel_width, 12 + panel_height, 72 + panel_height),
         ]
-        for index, player in enumerate(player_list):
+        for index, player in enumerate(panel_player_list):
             x_text, y_text, y_img = positions[index]
             c.create_text(x_text, y_text, text=player.name, font=("Arial", 20, "bold"), fill=self.player_color(player))
             image = self.load_player_image(player, pfp_size)
