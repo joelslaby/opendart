@@ -8,6 +8,16 @@ OpenDart is a darts scoreboard app with three playable modes:
 
 Primary use case is 2v2 teams games.
 
+## UI Examples
+
+### 501
+
+![501 UI](/Users/jslaby/Documents/projects/darts/opendart/docs/UI_501.png)
+
+### Cricket
+
+![Cricket UI](/Users/jslaby/Documents/projects/darts/opendart/docs/UI_cricket.png)
+
 ## Features
 
 - Fullscreen dartboard click UI
