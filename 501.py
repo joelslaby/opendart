@@ -128,7 +128,7 @@ class DartsApp:
             state="readonly",
             width=11,
         )
-        self.stats_view_menu.place(x=right_column_x + 10, y=stats_y+450)
+        self.stats_view_menu.place(x=right_column_x + 160, y=stats_y+450)
         self.stats_view_var.trace_add("write", self.handle_stats_view_change)
 
         btn_frame1 = tk.Frame(root)
@@ -1258,7 +1258,7 @@ class DartsApp:
             for player in team_players:
                 c.create_rectangle(left, y, right, y + player_box_height, fill=STATS_BG, outline="")
                 player_text = self.contrast_text_color(STATS_BG)
-                c.create_text(center_x, y + 7, anchor="n", text=player["name"], font=("Arial", 12, "bold"), fill=player_colors.get(player["name"], team_color))
+                c.create_text(left + 8, y + 7, anchor="nw", text=player["name"], font=("Arial", 12, "bold"), fill=player_colors.get(player["name"], team_color))
                 if player["name"] == active_player:
                     badge_w = 42
                     c.create_rectangle(right - badge_w - 8, y + 7, right - 8, y + 21, fill=SCOREBOARD_HIGHLIGHT, outline="")
