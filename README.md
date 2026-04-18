@@ -12,11 +12,11 @@ Primary use case is 2v2 teams games.
 
 ### 501
 
-![501 UI](/Users/jslaby/Documents/projects/darts/opendart/docs/UI_501.png)
+![501 UI](docs/UI_501.png)
 
 ### Cricket
 
-![Cricket UI](/Users/jslaby/Documents/projects/darts/opendart/docs/UI_cricket.png)
+![Cricket UI](docs/UI_cricket.png)
 
 ## Features
 
@@ -171,7 +171,7 @@ Profile images are looked up by searching `profile_pics/` for a filename contain
 
 ### Import behavior
 
-Both [501.py](/Users/jslaby/Documents/projects/darts/opendart/501.py) and [cricket.py](/Users/jslaby/Documents/projects/darts/opendart/cricket.py) are safe to import because they only create a Tk root inside `if __name__ == "__main__":`.
+Both [501.py](501.py) and [cricket.py](cricket.py) are safe to import because they only create a Tk root inside `if __name__ == "__main__":`.
 
 ### Known limitations
 
