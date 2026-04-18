@@ -51,8 +51,9 @@ TEXT_LIGHT = "#f5f1ea"
 
 
 class DartsApp:
-    def __init__(self, root):
+    def __init__(self, root, on_back=None, initial_mode="teams"):
         self.root = root
+        self.on_back = on_back
         root.title("Cricket Darts")
         root.attributes("-fullscreen", True)
         x = root.winfo_width()
@@ -96,8 +97,8 @@ class DartsApp:
         self.canvas_zoom.place(x=right_column_x, y=0)
         self.canvas.create_image(0, 0, anchor=tk.NW, image=self.board_img)
 
-        self.cursor_label = tk.Label(root, text="x: 0  y: 0", font=("Arial", 10))
-        self.cursor_label.pack(anchor="w")
+        # self.cursor_label = tk.Label(root, text="x: 0  y: 0", font=("Arial", 10))
+        # self.cursor_label.pack(anchor="w")
 
         self.canvas.bind("<Button-1>", self.click)
         self.canvas.bind("<Motion>", self.update_cursor)
@@ -136,21 +137,23 @@ class DartsApp:
         self.stats_view_var.trace_add("write", self.handle_stats_view_change)
 
         btn_frame1 = tk.Frame(root)
-        btn_frame1.place(x=5, y=630)
-        tk.Button(btn_frame1, text="Undo", font=("Arial", 30), command=self.undo).pack(side=tk.LEFT)
-        tk.Button(btn_frame1, text="Save", font=("Arial", 30), command=self.save).pack(side=tk.LEFT)
-        tk.Button(btn_frame1, text="Load", font=("Arial", 30), command=self.load).pack(side=tk.LEFT)
-        tk.Button(btn_frame1, text="Reset", font=("Arial", 30), command=self.reset).pack(side=tk.LEFT)
+        btn_frame1.place(x=5, y=650)
+        if self.on_back:
+            tk.Button(btn_frame1, text="Menu", font=("Arial", 24), command=self.on_back, padx=0).pack(side=tk.LEFT)
+        tk.Button(btn_frame1, text="Undo", font=("Arial", 24), command=self.undo, padx=0).pack(side=tk.LEFT)
+        tk.Button(btn_frame1, text="Load", font=("Arial", 24), command=self.load, padx=0).pack(side=tk.LEFT)
+        tk.Button(btn_frame1, text="New Game", font=("Arial", 24), command=self.reset, padx=0).pack(side=tk.LEFT)
 
         btn_frame2 = tk.Frame(root)
-        btn_frame2.place(x=5, y=680)
-        tk.Button(btn_frame2, text="Save Setup...", font=("Arial", 30), command=self.save_setup).pack(side=tk.LEFT)
-        tk.Button(btn_frame2, text="Save As...", font=("Arial", 30), command=self.save_as).pack(side=tk.RIGHT)
+        btn_frame2.place(x=5, y=690)
+        tk.Button(btn_frame2, text="Save", font=("Arial", 24), command=self.save).pack(side=tk.LEFT)
+        tk.Button(btn_frame2, text="Save Setup...", font=("Arial", 24), command=self.save_setup).pack(side=tk.LEFT)
+        tk.Button(btn_frame2, text="Save As...", font=("Arial", 24), command=self.save_as).pack(side=tk.RIGHT)
 
         btn_frame3 = tk.Frame(root)
         btn_frame3.place(x=10, y=730)
         tk.Entry(btn_frame3, textvariable=self.folder_path_var, font=("Arial", 16), width=40).pack(
-            side=tk.TOP, pady=10
+            side=tk.TOP, pady=5
         )
 
         mode_frame = tk.Frame(root)
@@ -238,7 +241,7 @@ class DartsApp:
         self.dart_history = []
         self.mark_history_cache = {}
 
-        self.set_game_mode("teams", preserve_names=False)
+        self.set_game_mode(initial_mode, preserve_names=False)
 
     def is_solo_mode(self):
         return self.mode_var.get() == "solo"
@@ -322,7 +325,7 @@ class DartsApp:
         self.set_game_mode(new_mode)
 
     def update_cursor(self, event):
-        self.cursor_label.config(text=f"x: {event.x}   y: {event.y}")
+        # self.cursor_label.config(text=f"x: {event.x}   y: {event.y}")
         self.draw_zoomboard(event.x, event.y)
 
     def click(self, event):
@@ -1395,6 +1398,7 @@ class DartsApp:
                 )
                 c.create_image(left, board_y, anchor=tk.NW, image=self.stats_board_photos[side])
 
-root = tk.Tk()
-app = DartsApp(root)
-root.mainloop()
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = DartsApp(root)
+    root.mainloop()

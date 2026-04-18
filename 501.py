@@ -54,9 +54,10 @@ TEXT_LIGHT = "#f5f1ea"
 
 class DartsApp:
 
-    def __init__(self, root):
+    def __init__(self, root, on_back=None):
 
         self.root = root
+        self.on_back = on_back
         root.title("501 Darts")
         root.attributes('-fullscreen', True)
         x = root.winfo_width()
@@ -133,17 +134,19 @@ class DartsApp:
         self.stats_view_var.trace_add("write", self.handle_stats_view_change)
 
         btn_frame1 = tk.Frame(root)
-        btn_frame1.place(x=5, y=690)
+        btn_frame1.place(x=5, y=700)
 
-        tk.Button(btn_frame1,text="Undo",font=("Arial",30),command=self.undo).pack(side=tk.LEFT)
-        tk.Button(btn_frame1,text="Save",font=("Arial",30),command=self.save).pack(side=tk.LEFT)
-        tk.Button(btn_frame1,text="Load",font=("Arial",30),command=self.load).pack(side=tk.LEFT)
-        tk.Button(btn_frame1,text="Reset",font=("Arial",30),command=self.reset).pack(side=tk.LEFT)
+        if self.on_back:
+            tk.Button(btn_frame1,text="Menu",font=("Arial",24),command=self.on_back, padx=0).pack(side=tk.LEFT)
+        tk.Button(btn_frame1,text="Undo",font=("Arial",24),command=self.undo, padx=0).pack(side=tk.LEFT)
+        tk.Button(btn_frame1,text="Load",font=("Arial",24),command=self.load, padx=0).pack(side=tk.LEFT)
+        tk.Button(btn_frame1,text="New Game",font=("Arial",24),command=self.reset, padx=0).pack(side=tk.LEFT)
 
         btn_frame2 = tk.Frame(root)
         btn_frame2.place(x=5, y=740)
-        tk.Button(btn_frame2,text="Save Setup...",font=("Arial",30),command=self.save_setup).pack(side=tk.LEFT)
-        tk.Button(btn_frame2,text="Save As...",font=("Arial",30),command=self.save_as).pack(side=tk.RIGHT)
+        tk.Button(btn_frame2,text="Save",font=("Arial",24),command=self.save).pack(side=tk.LEFT)
+        tk.Button(btn_frame2,text="Save Setup...",font=("Arial",24),command=self.save_setup).pack(side=tk.LEFT)
+        tk.Button(btn_frame2,text="Save As...",font=("Arial",24),command=self.save_as).pack(side=tk.RIGHT)
 
         btn_frame3 = tk.Frame(root)
         btn_frame3.place(x=50, y=785)
@@ -1345,10 +1348,7 @@ class DartsApp:
                 c.create_image(left, board_y, anchor=tk.NW, image=self.stats_board_photos[side])
 
 
-# -------------------------
-# Run
-# -------------------------
-
-root = tk.Tk()
-app = DartsApp(root)
-root.mainloop()
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = DartsApp(root)
+    root.mainloop()
