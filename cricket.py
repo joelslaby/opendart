@@ -505,7 +505,7 @@ class DartsApp:
         }
         for hit in self.dart_history:
             player_name = hit["player"]
-            side = hit.get("team", 0)
+            side = self.game.team_index_for_player(player_name) if player_name in player_stats else hit.get("team", 0)
             number = hit["number"]
             multiplier = hit["multiplier"]
             marks = multiplier if number in CRICKET_NUMBERS else 0
@@ -1121,24 +1121,27 @@ class DartsApp:
             team_color = T1_COLOR if side == 0 else T2_COLOR
             team_fill = STATS_PANEL if side == 0 else STATS_PANEL_ALT
 
-            c.create_rectangle(left, top_y, right, top_y + team_box_height, fill=team_fill, outline="")
-            c.create_text(left + 8, top_y + 7, anchor="nw", text=team["label"], font=("Arial", 14, "bold"), fill=team_color)
-            self.draw_inline_stats(
-                c,
-                left + 8,
-                top_y + 24,
-                [
-                    ("M", team["marks"]),
-                    ("MPR", f"{team['mpr']:.2f}"),
-                    ("hit", f"{team['hit_rate']:.0f}%"),
-                    ("B", team["bulls"]),
-                    ("T", team["triples"]),
-                ],
-                ("Arial", 10, "bold"),
-                ("Arial", 10),
-            )
+            if self.is_solo_mode():
+                y = top_y
+            else:
+                c.create_rectangle(left, top_y, right, top_y + team_box_height, fill=team_fill, outline="")
+                c.create_text(left + 8, top_y + 7, anchor="nw", text=team["label"], font=("Arial", 14, "bold"), fill=team_color)
+                self.draw_inline_stats(
+                    c,
+                    left + 8,
+                    top_y + 24,
+                    [
+                        ("M", team["marks"]),
+                        ("MPR", f"{team['mpr']:.2f}"),
+                        ("hit", f"{team['hit_rate']:.0f}%"),
+                        ("B", team["bulls"]),
+                        ("T", team["triples"]),
+                    ],
+                    ("Arial", 10, "bold"),
+                    ("Arial", 10),
+                )
+                y = top_y + team_box_height + 3
 
-            y = top_y + team_box_height + 3
             for player in team_players:
                 c.create_rectangle(left, y, right, y + player_box_height, fill=STATS_BG, outline="")
                 c.create_text(
