@@ -1,10 +1,13 @@
 import os
 import tkinter as tk
 from datetime import datetime
-from math import hypot
+from math import ceil, hypot
 from tkinter import simpledialog, ttk
 
 from PIL import Image, ImageTk
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib-codex")
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+from matplotlib.figure import Figure
 
 from dart_engine.helpers_cricket import cricket_marks
 from dart_engine.cricket_stats import build_all_cricket_marks_by_turn
@@ -43,6 +46,8 @@ STATS_BG = "#f3efe7"
 STATS_PANEL = "#e5ddd0"
 STATS_PANEL_ALT = "#ddd3c3"
 TEXT_DARK = "#2f2419"
+TEXT_LIGHT = "#f5f1ea"
+TEXT_LIGHT = "#f5f1ea"
 
 
 class DartsApp:
@@ -72,6 +77,7 @@ class DartsApp:
         self.infoboard_turn_summary = None
         self.stats_cache = {}
         self.stats_board_photos = {}
+        self.stats_view_var = tk.StringVar(value="Shot Map")
 
         self.canvas = tk.Canvas(root, width=self.size, height=self.size)
         self.canvas.pack()
@@ -107,15 +113,26 @@ class DartsApp:
         self.info_canvas.place(x=x / 2 - self.size / 2 + 1, y=600)
 
         stats_y = int(zoom_height) + 2
+        # stats_control_height = 20 - stats_control_height - 8
         stats_height = self.screen_height - stats_y - 2
         self.stats_canvas = tk.Canvas(
             root,
             width=right_column_width,
             height=stats_height,
-            bg=INFOBOARD_BG,
+            # bg=INFOBOARD_BG,
             highlightthickness=0,
         )
         self.stats_canvas.place(x=right_column_x, y=stats_y)
+        self.stats_view_menu = ttk.Combobox(
+            root,
+            textvariable=self.stats_view_var,
+            values=["Shot Map", "Score Plot"],
+            font=("Arial", 14),
+            state="readonly",
+            width=11,
+        )
+        self.stats_view_menu.place(x=right_column_x + 10, y=stats_y+450)
+        self.stats_view_var.trace_add("write", self.handle_stats_view_change)
 
         btn_frame1 = tk.Frame(root)
         btn_frame1.place(x=5, y=630)
@@ -394,8 +411,8 @@ class DartsApp:
 
     def team_player_colors(self, side, count):
         palettes = {
-            0: ["#6a83ff", "#2f52d6", "#94a6ff", "#4c66ff"],
-            1: ["#ec6d00", "#b24a00", "#ff9b45", "#d85c00"],
+            0: ["#0b5cff", "#00a6fb", "#123b8f", "#58c4ff"],
+            1: ["#d94801", "#ff8c00", "#8c2f00", "#ffb454"],
         }
         palette = palettes[side]
         return [palette[index % len(palette)] for index in range(max(1, count))]
@@ -430,6 +447,97 @@ class DartsApp:
             )
             bbox = canvas.bbox(value_id)
             cursor_x = (bbox[2] if bbox else cursor_x) + gap
+
+    def contrast_text_color(self, background_color):
+        r16, g16, b16 = self.root.winfo_rgb(background_color)
+        r = r16 / 65535
+        g = g16 / 65535
+        b = b16 / 65535
+        luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        return TEXT_DARK if luminance > 0.55 else TEXT_LIGHT
+
+    def tk_color_to_hex(self, color):
+        r16, g16, b16 = self.root.winfo_rgb(color)
+        return f"#{r16 // 256:02x}{g16 // 256:02x}{b16 // 256:02x}"
+
+    def handle_stats_view_change(self, *_):
+        self.draw_statsboard()
+
+    def render_cricket_progress_plot(self, size, player_names, progression, player_colors, text_color, bg_color, axis_limits):
+        bg_color = "#ffffff"
+        text_color = "#000000"
+        fig = Figure(figsize=(size / 100, size / 100), dpi=100, facecolor=bg_color)
+        ax_left = fig.add_subplot(111)
+        ax_right = ax_left.twinx()
+        ax_left.set_facecolor(bg_color)
+        ax_right.set_facecolor("none")
+
+        max_x = axis_limits["max_x"]
+        max_marks = axis_limits["max_marks"]
+        max_points = axis_limits["max_points"]
+        if max_x == 0:
+            max_x = 1
+        if max_marks == 0:
+            max_marks = 1
+        if max_points == 0:
+            max_points = 1
+
+        ax_left.set_xlim(0, max_x)
+        ax_left.set_ylim(0, max_marks)
+        ax_right.set_ylim(0, max_points)
+        ax_left.set_yticks(list(range(0, max_marks + 1, 5)))
+        ax_left.grid(True, axis="y", linestyle="--", linewidth=0.6, alpha=0.35, color=text_color)
+
+        right_tick_step = max(10, int(round(max_points / 4 / 10.0) * 10) or 10)
+        ax_right.set_yticks(list(range(0, max_points + 1, right_tick_step)))
+
+        for name in player_names:
+            series = progression.get(name, {"marks": [(0, 0)], "points": [(0, 0)]})
+            color = player_colors.get(name, text_color)
+            mark_x = [darts for darts, _ in series["marks"]]
+            mark_y = [marks for _, marks in series["marks"]]
+            point_x = [darts for darts, _ in series["points"]]
+            point_y = [points for _, points in series["points"]]
+            ax_left.plot(mark_x, mark_y, color=color, linewidth=2.5, marker="o", markersize=3)
+            ax_right.plot(point_x, point_y, color=color, linewidth=2.0, linestyle="--")
+
+        legend_handles = [ax_left.plot([], [], color="#000000", linewidth=2.5)[0], ax_left.plot([], [], color="#000000", linewidth=2.0, linestyle="--")[0]]
+        legend_labels = ["Marks", "Points"]
+        for name in player_names:
+            legend_handles.append(ax_left.plot([], [], color=player_colors.get(name, "#000000"), linewidth=2.5)[0])
+            legend_labels.append(name)
+        ax_left.legend(
+            legend_handles,
+            legend_labels,
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.2),
+            frameon=False,
+            fontsize=7,
+            ncol=2,
+        )
+
+        ax_left.set_xlabel("dt", color=text_color, fontsize=8)
+        ax_left.xaxis.labelpad = 2
+        ax_left.set_ylabel("M", color=text_color, fontsize=8, fontweight="bold")
+        ax_right.set_ylabel("Pts", color=text_color, fontsize=8, fontweight="bold")
+        ax_left.yaxis.labelpad = 2
+        ax_right.yaxis.labelpad = 2
+        ax_left.tick_params(axis="x", colors=text_color, labelsize=8)
+        ax_left.tick_params(axis="y", colors=text_color, labelsize=8)
+        ax_right.tick_params(axis="y", colors=text_color, labelsize=8)
+        for spine in ("bottom", "left"):
+            ax_left.spines[spine].set_color(text_color)
+        ax_left.spines["top"].set_visible(False)
+        ax_right.spines["top"].set_visible(False)
+        ax_right.spines["left"].set_visible(False)
+        ax_right.spines["right"].set_color(text_color)
+        fig.subplots_adjust(left=0.24, right=0.76, bottom=0.3, top=0.93)
+
+        canvas = FigureCanvasAgg(fig)
+        canvas.draw()
+        rgba = canvas.buffer_rgba()
+        image = Image.frombuffer("RGBA", canvas.get_width_height(), rgba, "raw", "RGBA", 0, 1)
+        return ImageTk.PhotoImage(image)
 
     def get_player_mark_history(self, player):
         player_name = player.name if hasattr(player, "name") else player
@@ -496,6 +604,10 @@ class DartsApp:
                 player_color_lookup[name] = color
 
         distribution_points = {0: [], 1: []}
+        player_progression = {
+            player.name: {"marks": [(0, 0)], "points": [(0, 0)]}
+            for player in players
+        }
         completed_turns = {player.name: [] for player in players}
         current_turn_player = None
         current_turn_hits = []
@@ -503,12 +615,17 @@ class DartsApp:
             0: {number: 3 for number in CRICKET_NUMBERS},
             1: {number: 3 for number in CRICKET_NUMBERS},
         }
+        player_marks_total = {player.name: 0 for player in players}
+        player_points_total = {player.name: 0 for player in players}
+        player_darts_progress = {player.name: 0 for player in players}
         for hit in self.dart_history:
             player_name = hit["player"]
             side = self.game.team_index_for_player(player_name) if player_name in player_stats else hit.get("team", 0)
             number = hit["number"]
             multiplier = hit["multiplier"]
             marks = multiplier if number in CRICKET_NUMBERS else 0
+            points_scored = 0
+            marks_scored = 0
 
             if player_name != current_turn_player:
                 if current_turn_player in completed_turns and len(current_turn_hits) == 3:
@@ -529,15 +646,25 @@ class DartsApp:
                     hits_remaining = team_remaining[side][number]
                     overflow_hits = max(0, multiplier - hits_remaining)
                     if hits_remaining > 0:
-                        team_remaining[side][number] -= min(multiplier, hits_remaining)
+                        applied_hits = min(multiplier, hits_remaining)
+                        team_remaining[side][number] -= applied_hits
+                        marks_scored += applied_hits
                     if team_remaining[side][number] == 0 and team_remaining[opponent][number] > 0:
-                        player_stats[player_name]["points"] += overflow_hits * number
+                        points_scored = overflow_hits * number
+                        player_stats[player_name]["points"] += points_scored
+                        marks_scored += overflow_hits
 
             team_stats[side]["darts"] += 1
             team_stats[side]["marks"] += marks
             team_stats[side]["scoring_hits"] += 1 if marks else 0
             team_stats[side]["bulls"] += 1 if number == 25 else 0
             team_stats[side]["triples"] += 1 if multiplier == 3 else 0
+            if player_name in player_progression:
+                player_darts_progress[player_name] += 1
+                player_marks_total[player_name] += marks_scored
+                player_points_total[player_name] += points_scored
+                player_progression[player_name]["marks"].append((player_darts_progress[player_name], player_marks_total[player_name]))
+                player_progression[player_name]["points"].append((player_darts_progress[player_name], player_points_total[player_name]))
             distribution_points[side].append(
                 {
                     "x": hit["x"],
@@ -568,10 +695,30 @@ class DartsApp:
                 else 0.0
             )
 
+        max_plot_x = max(
+            (point[0] for series in player_progression.values() for point in series["marks"]),
+            default=1,
+        )
+        max_plot_marks = max(
+            (point[1] for series in player_progression.values() for point in series["marks"]),
+            default=0,
+        )
+        max_plot_points = max(
+            (point[1] for series in player_progression.values() for point in series["points"]),
+            default=0,
+        )
+        plot_limits = {
+            "max_x": max(1, max_plot_x),
+            "max_marks": max(5, int(ceil((max_plot_marks + 1) / 5.0) * 5)),
+            "max_points": max(10, int(ceil((max_plot_points + 2) / 10.0) * 10)),
+        }
+
         self.stats_cache = {
             "players": [player_stats[player.name] for player in players],
             "teams": [team_stats[0], team_stats[1]],
             "distribution": distribution_points,
+            "player_progression": player_progression,
+            "plot_limits": plot_limits,
             "team_players": team_players,
             "player_colors": player_color_lookup,
             "active_player": self.game.active_player().name,
@@ -932,8 +1079,8 @@ class DartsApp:
 
         if turn_summary["next_player_flag"]:
             next_player = self.game.active_player()
-            c.create_text(10, 140, anchor="w", text="Next player:", font=("Arial", 30, "bold"), fill="black")
             c.create_text(10, 140, anchor="w", text=f"Next player: {next_player.name}", font=("Arial", 30, "bold"), fill=self.player_color(next_player))
+            c.create_text(10, 140, anchor="w", text="Next player:", font=("Arial", 30, "bold"), fill="black")
             c.create_text(panel_width * 2 - 10, 140, anchor="e", text=self.team_name_for_player(next_player), font=("Arial", 30, "bold"), fill=self.player_color(next_player))
 
         image_positions = [
@@ -1094,8 +1241,13 @@ class DartsApp:
         players = self.stats_cache.get("players", [])
         teams = self.stats_cache.get("teams", [])
         distribution = self.stats_cache.get("distribution", {0: [], 1: []})
+        player_progression = self.stats_cache.get("player_progression", {})
         player_colors = self.stats_cache.get("player_colors", {})
         active_player = self.stats_cache.get("active_player", "")
+        surface_text = self.contrast_text_color(c.cget("bg"))
+        current_view = self.stats_view_var.get()
+        axis_limits = self.stats_cache.get("plot_limits", {"max_x": 1, "max_marks": 5, "max_points": 10})
+        bg_hex = self.tk_color_to_hex(c.cget("bg"))
 
         outer_pad = 10
         gutter = 8
@@ -1103,7 +1255,7 @@ class DartsApp:
         col_lefts = [outer_pad, outer_pad + col_width + gutter]
         title_y = 10
 
-        c.create_text(outer_pad, title_y, anchor="nw", text="Live Stats", font=("Arial", 19, "bold"), fill=TEXT_DARK)
+        c.create_text(outer_pad, title_y, anchor="nw", text="Live Stats", font=("Arial", 19, "bold"), fill=surface_text)
 
         team_box_height = 44
         player_box_height = 58
@@ -1120,6 +1272,7 @@ class DartsApp:
             team_players = [player for player in players if player["side"] == side]
             team_color = T1_COLOR if side == 0 else T2_COLOR
             team_fill = STATS_PANEL if side == 0 else STATS_PANEL_ALT
+            team_text = self.contrast_text_color(team_fill)
 
             if self.is_solo_mode():
                 y = top_y
@@ -1139,11 +1292,13 @@ class DartsApp:
                     ],
                     ("Arial", 10, "bold"),
                     ("Arial", 10),
+                    color=team_text,
                 )
                 y = top_y + team_box_height + 3
 
             for player in team_players:
                 c.create_rectangle(left, y, right, y + player_box_height, fill=STATS_BG, outline="")
+                player_text = self.contrast_text_color(STATS_BG)
                 c.create_text(
                     left + 8,
                     y + 7,
@@ -1168,6 +1323,7 @@ class DartsApp:
                     ],
                     ("Arial", 9, "bold"),
                     ("Arial", 9),
+                    color=player_text,
                 )
                 self.draw_inline_stats(
                     c,
@@ -1181,29 +1337,42 @@ class DartsApp:
                     ],
                     ("Arial", 9, "bold"),
                     ("Arial", 9),
+                    color=player_text,
                 )
                 y += player_box_height + player_gap
 
-            c.create_text(left, y + section_gap, anchor="nw", text="Shot Map", font=("Arial", 12, "bold"), fill=TEXT_DARK)
+            c.create_text(left, y + section_gap, anchor="nw", text=current_view, font=("Arial", 12, "bold"), fill=surface_text)
             board_y = y + section_gap + board_title_gap
             available_board_height = max(1, height - board_y - board_bottom_pad)
             board_size = int(max(1, min(col_width, available_board_height)))
-            board_img = self.zoom_source_img.resize((board_size, board_size), Image.Resampling.LANCZOS)
-            self.stats_board_photos[side] = ImageTk.PhotoImage(board_img)
-            c.create_image(left, board_y, anchor=tk.NW, image=self.stats_board_photos[side])
+            if current_view == "Shot Map":
+                board_img = self.zoom_source_img.resize((board_size, board_size), Image.Resampling.LANCZOS)
+                self.stats_board_photos[side] = ImageTk.PhotoImage(board_img)
+                c.create_image(left, board_y, anchor=tk.NW, image=self.stats_board_photos[side])
 
-            for hit in distribution.get(side, []):
-                dot_x = left + hit["x"] / 600 * board_size
-                dot_y = board_y + hit["y"] / 600 * board_size
-                c.create_oval(dot_x - 2, dot_y - 2, dot_x + 2, dot_y + 2, fill=hit["color"], outline="")
+                for hit in distribution.get(side, []):
+                    dot_x = left + hit["x"] / 600 * board_size
+                    dot_y = board_y + hit["y"] / 600 * board_size
+                    c.create_oval(dot_x - 2, dot_y - 2, dot_x + 2, dot_y + 2, fill=hit["color"], outline="")
 
-            legend_y = board_y + board_size + board_gap
-            legend_x = left
-            for player in team_players:
-                color = player_colors.get(player["name"], team_color)
-                c.create_oval(legend_x, legend_y + 2, legend_x + 8, legend_y + 10, fill=color, outline="")
-                c.create_text(legend_x + 12, legend_y, anchor="nw", text=player["name"], font=("Arial", 9, "bold"), fill=TEXT_DARK)
-                legend_x += max(48, 16 + len(player["name"]) * 7)
+                legend_y = board_y + board_size + board_gap
+                legend_x = left
+                for player in team_players:
+                    color = player_colors.get(player["name"], team_color)
+                    c.create_oval(legend_x, legend_y + 2, legend_x + 8, legend_y + 10, fill=color, outline="")
+                    c.create_text(legend_x + 12, legend_y, anchor="nw", text=player["name"], font=("Arial", 9, "bold"), fill=surface_text)
+                    legend_x += max(48, 16 + len(player["name"]) * 7)
+            else:
+                self.stats_board_photos[side] = self.render_cricket_progress_plot(
+                    board_size,
+                    [player["name"] for player in team_players],
+                    player_progression,
+                    player_colors,
+                    surface_text,
+                    bg_hex,
+                    axis_limits,
+                )
+                c.create_image(left, board_y, anchor=tk.NW, image=self.stats_board_photos[side])
 
 root = tk.Tk()
 app = DartsApp(root)
