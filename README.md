@@ -1,12 +1,10 @@
 # OpenDart
 
-OpenDart is a darts scoreboard app with three playable modes:
+OpenDart is a python-based darts scoreboard app (primarily for 2v2) with three playable modes:
 
 - `501`
 - `Cricket`
 - `Cricket 1v1`
-
-Primary use case is 2v2 teams games.
 
 ## UI Examples
 

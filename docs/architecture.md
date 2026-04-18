@@ -12,7 +12,7 @@ The app is split into three layers:
 
 ### Launcher
 
-- [darts.py](/Users/jslaby/Documents/projects/darts/opendart/darts.py)
+- [darts.py](darts.py)
 
 Creates a single Tk root and swaps between:
 
@@ -24,7 +24,7 @@ Each screen gets an `on_back` callback so it can return to the menu.
 
 ### 501 screen
 
-- [501.py](/Users/jslaby/Documents/projects/darts/opendart/501.py)
+- [501.py](501.py)
 
 Responsibilities:
 
@@ -36,7 +36,7 @@ Responsibilities:
 
 ### Cricket screen
 
-- [cricket.py](/Users/jslaby/Documents/projects/darts/opendart/cricket.py)
+- [cricket.py](cricket.py)
 
 Responsibilities:
 
@@ -50,7 +50,7 @@ Responsibilities:
 
 ### 501 engine
 
-- [dart_engine/params_501.py](/Users/jslaby/Documents/projects/darts/opendart/dart_engine/params_501.py)
+- [dart_engine/params_501.py](dart_engine/params_501.py)
 
 Encapsulates:
 
@@ -62,8 +62,8 @@ Encapsulates:
 
 ### Cricket engine
 
-- [dart_engine/params_cricket.py](/Users/jslaby/Documents/projects/darts/opendart/dart_engine/params_cricket.py)
-- [dart_engine/params_cricket_1x1.py](/Users/jslaby/Documents/projects/darts/opendart/dart_engine/params_cricket_1x1.py)
+- [dart_engine/params_cricket.py](dart_engine/params_cricket.py)
+- [dart_engine/params_cricket_1x1.py](dart_engine/params_cricket_1x1.py)
 
 Encapsulate:
 
@@ -76,7 +76,7 @@ Encapsulate:
 
 ### Save/load and replay
 
-- [dart_engine/ui_common.py](/Users/jslaby/Documents/projects/darts/opendart/dart_engine/ui_common.py)
+- [dart_engine/ui_common.py](dart_engine/ui_common.py)
 
 Contains shared logic for:
 
@@ -87,7 +87,7 @@ Contains shared logic for:
 
 ### Player display helpers
 
-- [dart_engine/player_ui.py](/Users/jslaby/Documents/projects/darts/opendart/dart_engine/player_ui.py)
+- [dart_engine/player_ui.py](dart_engine/player_ui.py)
 
 Contains:
 
@@ -97,8 +97,8 @@ Contains:
 
 ### Scoring/stat helpers
 
-- [dart_engine/helpers_501.py](/Users/jslaby/Documents/projects/darts/opendart/dart_engine/helpers_501.py)
-- [dart_engine/cricket_stats.py](/Users/jslaby/Documents/projects/darts/opendart/dart_engine/cricket_stats.py)
+- [dart_engine/helpers_501.py](dart_engine/helpers_501.py)
+- [dart_engine/cricket_stats.py](dart_engine/cricket_stats.py)
 
 These are used to derive replay-friendly histories and stats from raw dart events.
 
@@ -171,7 +171,7 @@ This keeps persistence simple and avoids syncing multiple saved state formats.
 ## Notes for future work
 
 - The UI files are still fairly large and contain both rendering and controller logic.
-- `swap_players_history()` and `swap_teams_history()` are still stubbed in [dart_engine/helpers_general.py](/Users/jslaby/Documents/projects/darts/opendart/dart_engine/helpers_general.py).
+- `swap_players_history()` and `swap_teams_history()` are still stubbed in [dart_engine/helpers_general.py](dart_engine/helpers_general.py).
 - If the project grows, a natural next split would be:
   - `views/`
   - `controllers/`
