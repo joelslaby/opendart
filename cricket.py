@@ -42,6 +42,9 @@ T2_COLOR = "#ec6d00"
 SCOREBOARD_BG = "darkolivegreen"
 INFOBOARD_BG = "white"
 SCOREBOARD_HIGHLIGHT = "olivedrab"
+RECBOARD_BG = "#323232"
+REC_FILL = "dimgray"
+REC_FILL_RED = "dimgray"
 STATS_BG = "#f3efe7"
 STATS_PANEL = "#e5ddd0"
 STATS_PANEL_ALT = "#ddd3c3"
@@ -110,6 +113,14 @@ class DartsApp:
         )
         self.score_canvas.place(x=0, y=0)
 
+        self.rec_canvas = tk.Canvas(
+            root,
+            width=x / 2 - self.size / 2 - 2,
+            height=100 - 2,
+            bg=RECBOARD_BG,
+        )
+        self.rec_canvas.place(x=0, y=600)
+
         self.info_canvas = tk.Canvas(root, width=self.size - 7, height=y - 600 - 4, bg=INFOBOARD_BG)
         self.info_canvas.place(x=x / 2 - self.size / 2 + 1, y=600)
 
@@ -136,7 +147,7 @@ class DartsApp:
         self.stats_view_var.trace_add("write", self.handle_stats_view_change)
 
         btn_frame1 = tk.Frame(root)
-        btn_frame1.place(x=5, y=650)
+        btn_frame1.place(x=5, y=700)
         if self.on_back:
             tk.Button(btn_frame1, text="Menu", font=("Arial", 24), command=self.on_back, padx=0).pack(side=tk.LEFT)
         tk.Button(btn_frame1, text="Undo", font=("Arial", 24), command=self.undo, padx=0).pack(side=tk.LEFT)
@@ -144,15 +155,15 @@ class DartsApp:
         tk.Button(btn_frame1, text="New Game", font=("Arial", 24), command=self.reset, padx=0).pack(side=tk.LEFT)
 
         btn_frame2 = tk.Frame(root)
-        btn_frame2.place(x=5, y=690)
+        btn_frame2.place(x=5, y=740)
         tk.Button(btn_frame2, text="Save", font=("Arial", 24), command=self.save).pack(side=tk.LEFT)
         tk.Button(btn_frame2, text="Save Setup...", font=("Arial", 24), command=self.save_setup).pack(side=tk.LEFT)
         tk.Button(btn_frame2, text="Save As...", font=("Arial", 24), command=self.save_as).pack(side=tk.RIGHT)
 
         btn_frame3 = tk.Frame(root)
-        btn_frame3.place(x=10, y=730)
-        tk.Entry(btn_frame3, textvariable=self.folder_path_var, font=("Arial", 16), width=40).pack(
-            side=tk.TOP, pady=5
+        btn_frame3.place(x=5, y=785)
+        tk.Entry(btn_frame3, textvariable=self.folder_path_var, font=("Arial", 16), width=45).pack(
+            side=tk.TOP, pady=0
         )
 
         self.team1a_player_var = tk.StringVar(value=self.player_options[0])
@@ -161,7 +172,7 @@ class DartsApp:
         self.team2b_player_var = tk.StringVar(value=self.player_options[3])
 
         self.team1_frame = tk.Frame(root)
-        self.team1_frame.place(x=0, y=810)
+        self.team1_frame.place(x=0, y=815)
         tk.Label(self.team1_frame, text="Team 1: ", font=("Arial", 20)).pack(side=tk.LEFT, padx=5)
         self.dropdown_1a = ttk.Combobox(
             self.team1_frame,
@@ -371,6 +382,7 @@ class DartsApp:
         self.update_infoboard_turn_summary()
         self.draw_infoboard()
         self.draw_scoreboard()
+        self.draw_recboard()
         self.draw_statsboard()
 
     def draw_current_dart_marker(self, x, y):
@@ -430,6 +442,30 @@ class DartsApp:
         center_x = sum(hit["x"] for hit in turn_hits) / len(turn_hits)
         center_y = sum(hit["y"] for hit in turn_hits) / len(turn_hits)
         return sum(hypot(hit["x"] - center_x, hit["y"] - center_y) for hit in turn_hits) / len(turn_hits)
+
+    def scoring_objects_for_side(self, side):
+        if self.is_solo_mode():
+            return self.game.players[side], self.game.players[1 - side]
+        return self.game.teams[side], self.game.teams[1 - side]
+
+    def scoring_label_for_side(self, side):
+        if self.is_solo_mode():
+            return self.game.players[side].name
+        return self.game.teams[side].name
+
+    def bulls_left_to_win(self, side):
+        current, opponent = self.scoring_objects_for_side(side)
+        bull_marks_to_close = max(0, 3 - current.cricket_display[25])
+        if current.score >= opponent.score:
+            return bull_marks_to_close
+
+        score_gap = opponent.score - current.score
+        scoring_bulls = ceil(score_gap / 25)
+        return bull_marks_to_close + scoring_bulls
+
+    def bull_finish_available(self, side):
+        current, _ = self.scoring_objects_for_side(side)
+        return all(current.cricket_closed[number] for number in CRICKET_NUMBERS if number != 25)
 
     def draw_inline_stats(self, canvas, x, y, stats, label_font, value_font, color=TEXT_DARK, gap=10):
         cursor_x = x
@@ -1201,6 +1237,51 @@ class DartsApp:
         for idx, hit in enumerate(p1_hits[:3]):
             c.create_text(x_start + panel_width / 4 * (idx + 1), panel_height * 2 - box_height / 2, text=hit, font=("Arial", 20), fill="black")
         c.create_text(x_start + panel_width, panel_height * 2 - box_height / 2, text=f"{mark_sums[1]}M", font=("Arial", 20), fill="black")
+
+    def draw_recboard(self):
+        c = self.rec_canvas
+        c.delete("all")
+
+        size_x = 454
+        size_y = 98
+        rec_size_x = 180
+        rec_size_y = 60
+
+        c.create_line(size_x / 2, 10, size_x / 2, size_y - 10, fill="gray55", width=2)
+
+        for side in (0, 1):
+            center_x = size_x * (1 + 2 * side) / 4
+
+            if not self.bull_finish_available(side):
+                c.create_text(
+                    center_x,
+                    size_y / 2 + 6,
+                    anchor="center",
+                    text="",
+                    font=("Arial", 22, "bold"),
+                    fill="white",
+                )
+                continue
+
+            bulls_left = self.bulls_left_to_win(side)
+            status_text = "1 bull needed" if bulls_left == 1 else f"{bulls_left} bulls needed"
+
+            c.create_rectangle(
+                center_x - rec_size_x / 2,
+                size_y / 2 - rec_size_y / 2 + 8,
+                center_x + rec_size_x / 2,
+                size_y / 2 + rec_size_y / 2 + 8,
+                fill=REC_FILL_RED,
+                outline=REC_FILL_RED,
+            )
+            c.create_text(
+                center_x,
+                size_y / 2 + rec_size_y / 4 + 8,
+                anchor="s",
+                text=status_text,
+                font=("Arial", 24, "bold"),
+                fill="white",
+            )
 
     def draw_zoomboard(self, x, y):
         c = self.canvas_zoom
