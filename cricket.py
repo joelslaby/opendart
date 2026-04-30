@@ -612,6 +612,7 @@ class DartsApp:
                 "marks": 0,
                 "scoring_hits": 0,
                 "bulls": 0,
+                "doubles": 0,
                 "triples": 0,
                 "points": 0,
                 "previous_grouping": 0.0,
@@ -631,6 +632,7 @@ class DartsApp:
                 "marks": 0,
                 "scoring_hits": 0,
                 "bulls": 0,
+                "doubles": 0,
                 "triples": 0,
             }
             for side in (0, 1)
@@ -666,9 +668,9 @@ class DartsApp:
             side = self.game.team_index_for_player(player_name) if player_name in player_stats else hit.get("team", 0)
             number = hit["number"]
             multiplier = hit["multiplier"]
-            marks = multiplier if number in CRICKET_NUMBERS else 0
             points_scored = 0
             marks_scored = 0
+            valid_mark_hit = False
 
             if player_name != current_turn_player:
                 if current_turn_player in completed_turns and len(current_turn_hits) == 3:
@@ -677,31 +679,35 @@ class DartsApp:
                 current_turn_hits = []
             current_turn_hits.append(hit)
 
+            if number in CRICKET_NUMBERS:
+                opponent = 1 - side
+                hits_remaining = team_remaining[side][number]
+                overflow_hits = max(0, multiplier - hits_remaining)
+                if hits_remaining > 0:
+                    applied_hits = min(multiplier, hits_remaining)
+                    team_remaining[side][number] -= applied_hits
+                    marks_scored += applied_hits
+                if team_remaining[side][number] == 0 and team_remaining[opponent][number] > 0:
+                    points_scored = overflow_hits * number
+                    marks_scored += overflow_hits
+
+            valid_mark_hit = marks_scored > 0
+
             if player_name in player_stats:
                 player_stats[player_name]["darts"] += 1
-                player_stats[player_name]["marks"] += marks
-                player_stats[player_name]["scoring_hits"] += 1 if marks else 0
-                player_stats[player_name]["bulls"] += 1 if number == 25 else 0
-                player_stats[player_name]["triples"] += 1 if multiplier == 3 else 0
-
-                if number in CRICKET_NUMBERS:
-                    opponent = 1 - side
-                    hits_remaining = team_remaining[side][number]
-                    overflow_hits = max(0, multiplier - hits_remaining)
-                    if hits_remaining > 0:
-                        applied_hits = min(multiplier, hits_remaining)
-                        team_remaining[side][number] -= applied_hits
-                        marks_scored += applied_hits
-                    if team_remaining[side][number] == 0 and team_remaining[opponent][number] > 0:
-                        points_scored = overflow_hits * number
-                        player_stats[player_name]["points"] += points_scored
-                        marks_scored += overflow_hits
+                player_stats[player_name]["marks"] += marks_scored
+                player_stats[player_name]["scoring_hits"] += 1 if valid_mark_hit else 0
+                player_stats[player_name]["bulls"] += 1 if number == 25 and valid_mark_hit else 0
+                player_stats[player_name]["doubles"] += 1 if multiplier == 2 and valid_mark_hit else 0
+                player_stats[player_name]["triples"] += 1 if multiplier == 3 and valid_mark_hit else 0
+                player_stats[player_name]["points"] += points_scored
 
             team_stats[side]["darts"] += 1
-            team_stats[side]["marks"] += marks
-            team_stats[side]["scoring_hits"] += 1 if marks else 0
-            team_stats[side]["bulls"] += 1 if number == 25 else 0
-            team_stats[side]["triples"] += 1 if multiplier == 3 else 0
+            team_stats[side]["marks"] += marks_scored
+            team_stats[side]["scoring_hits"] += 1 if valid_mark_hit else 0
+            team_stats[side]["bulls"] += 1 if number == 25 and valid_mark_hit else 0
+            team_stats[side]["doubles"] += 1 if multiplier == 2 and valid_mark_hit else 0
+            team_stats[side]["triples"] += 1 if multiplier == 3 and valid_mark_hit else 0
             if player_name in player_progression:
                 player_darts_progress[player_name] += 1
                 player_marks_total[player_name] += marks_scored
@@ -1389,8 +1395,8 @@ class DartsApp:
                     [
                         ("M", team["marks"]),
                         ("MPR", f"{team['mpr']:.2f}"),
-                        ("hit", f"{team['hit_rate']:.0f}%"),
-                        ("B", team["bulls"]),
+                        ("HIT", f"{team['hit_rate']:.0f}%"),
+                        ("D", team["doubles"]),
                         ("T", team["triples"]),
                     ],
                     ("Arial", 10, "bold"),
@@ -1419,10 +1425,10 @@ class DartsApp:
                     left + 8,
                     y + 24,
                     [
-                        ("dt", player["darts"]),
+                        ("DCT", player["darts"]),
                         ("M", player["marks"]),
                         ("MPR", f"{player['mpr']:.2f}"),
-                        ("hit", f"{player['hit_rate']:.0f}%"),
+                        ("HIT", f"{player['hit_rate']:.0f}%"),
                     ],
                     ("Arial", 9, "bold"),
                     ("Arial", 9),
@@ -1433,10 +1439,10 @@ class DartsApp:
                     left + 8,
                     y + 39,
                     [
-                        ("B", player["bulls"]),
+                        ("D", player["doubles"]),
                         ("T", player["triples"]),
-                        ("Pts", player["points"]),
-                        ("Grp", f"{player['previous_grouping']:.1f}"),
+                        ("PTS", player["points"]),
+                        ("GRP", f"{player['previous_grouping']:.1f}"),
                     ],
                     ("Arial", 9, "bold"),
                     ("Arial", 9),

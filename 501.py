@@ -2,6 +2,7 @@ import os
 import tkinter as tk
 from dart_engine.params_501 import Hit, Game501
 from datetime import datetime
+from math import hypot
 from tkinter import messagebox, simpledialog, ttk
 
 from PIL import Image, ImageTk
@@ -399,6 +400,13 @@ class DartsApp:
             bbox = canvas.bbox(value_id)
             cursor_x = (bbox[2] if bbox else cursor_x) + gap
 
+    def previous_turn_grouping(self, turn_hits):
+        if len(turn_hits) < 2:
+            return 0.0
+        center_x = sum(hit["x"] for hit in turn_hits) / len(turn_hits)
+        center_y = sum(hit["y"] for hit in turn_hits) / len(turn_hits)
+        return sum(hypot(hit["x"] - center_x, hit["y"] - center_y) for hit in turn_hits) / len(turn_hits)
+
     def contrast_text_color(self, background_color):
         r16, g16, b16 = self.root.winfo_rgb(background_color)
         r = r16 / 65535
@@ -472,10 +480,12 @@ class DartsApp:
                 "darts": 0,
                 "scored": 0,
                 "bulls": 0,
+                "doubles": 0,
                 "triples": 0,
-                "ton_plus": 0,
-                "oneforty_plus": 0,
-                "oneeighty": 0,
+                "score_50_plus": 0,
+                "score_75_plus": 0,
+                "score_100_plus": 0,
+                "previous_grouping": 0.0,
             }
             for player in players
         }
@@ -486,6 +496,7 @@ class DartsApp:
                 "darts": 0,
                 "scored": 0,
                 "bulls": 0,
+                "doubles": 0,
                 "triples": 0,
             }
             for side in (0, 1)
@@ -503,26 +514,129 @@ class DartsApp:
 
         distribution_points = {0: [], 1: []}
         player_progression = {player.name: [(0, 0)] for player in players}
-        player_points_total = {player.name: 0 for player in players}
         player_darts_progress = {player.name: 0 for player in players}
+        completed_turns = {player.name: [] for player in players}
+        player_committed = {
+            player.name: {
+                "darts": 0,
+                "scored": 0,
+                "bulls": 0,
+                "doubles": 0,
+                "triples": 0,
+            }
+            for player in players
+        }
+        team_committed = {
+            side: {
+                "darts": 0,
+                "scored": 0,
+                "bulls": 0,
+                "doubles": 0,
+                "triples": 0,
+            }
+            for side in (0, 1)
+        }
+        player_pending = {
+            player.name: {
+                "darts": 0,
+                "scored": 0,
+                "bulls": 0,
+                "doubles": 0,
+                "triples": 0,
+            }
+            for player in players
+        }
+        team_pending = {
+            side: {
+                "darts": 0,
+                "scored": 0,
+                "bulls": 0,
+                "doubles": 0,
+                "triples": 0,
+            }
+            for side in (0, 1)
+        }
+        current_turn_player = None
+        current_turn_side = None
+        current_turn_hits = []
+        team_score = {0: 501, 1: 501}
+        team_turn_start = {0: 501, 1: 501}
+
+        def reset_pending(player_name, side):
+            for field in player_pending[player_name]:
+                player_pending[player_name][field] = 0
+            for field in team_pending[side]:
+                team_pending[side][field] = 0
+
+        def sync_display(player_name, side):
+            for field in ("darts", "scored", "bulls", "doubles", "triples"):
+                player_stats[player_name][field] = player_committed[player_name][field] + player_pending[player_name][field]
+                team_stats[side][field] = team_committed[side][field] + team_pending[side][field]
+
+        def commit_turn(player_name, side):
+            for field in ("darts", "scored", "bulls", "doubles", "triples"):
+                player_committed[player_name][field] += player_pending[player_name][field]
+                team_committed[side][field] += team_pending[side][field]
+            reset_pending(player_name, side)
+            sync_display(player_name, side)
+
         for hit in self.dart_history:
             player_name = hit["player"]
             side = self.game.team_index_for_player(player_name) if player_name in player_stats else hit.get("team", 0)
             points = hit["multiplier"] * hit["number"]
 
-            if player_name in player_stats:
-                player_stats[player_name]["darts"] += 1
-                player_stats[player_name]["scored"] += points
-                player_stats[player_name]["bulls"] += 1 if hit["number"] == 25 else 0
-                player_stats[player_name]["triples"] += 1 if hit["multiplier"] == 3 else 0
-                player_darts_progress[player_name] += 1
-                player_points_total[player_name] += points
-                player_progression[player_name].append((player_darts_progress[player_name], player_points_total[player_name]))
+            if player_name != current_turn_player:
+                current_turn_player = player_name
+                current_turn_side = side
+                current_turn_hits = []
+                team_turn_start[side] = team_score[side]
+                reset_pending(player_name, side)
+            current_turn_hits.append(hit)
 
-            team_stats[side]["darts"] += 1
-            team_stats[side]["scored"] += points
-            team_stats[side]["bulls"] += 1 if hit["number"] == 25 else 0
-            team_stats[side]["triples"] += 1 if hit["multiplier"] == 3 else 0
+            if player_name in player_stats:
+                player_darts_progress[player_name] += 1
+                player_pending[player_name]["darts"] += 1
+                player_pending[player_name]["scored"] += points
+                player_pending[player_name]["bulls"] += 1 if hit["number"] == 25 else 0
+                player_pending[player_name]["doubles"] += 1 if hit["multiplier"] == 2 else 0
+                player_pending[player_name]["triples"] += 1 if hit["multiplier"] == 3 else 0
+                team_pending[side]["darts"] += 1
+                team_pending[side]["scored"] += points
+                team_pending[side]["bulls"] += 1 if hit["number"] == 25 else 0
+                team_pending[side]["doubles"] += 1 if hit["multiplier"] == 2 else 0
+                team_pending[side]["triples"] += 1 if hit["multiplier"] == 3 else 0
+                sync_display(player_name, side)
+
+            team_score[side] -= points
+            winning_checkout = team_score[side] == 0 and hit["multiplier"] == 2
+            bust = team_score[side] <= 1 and not winning_checkout
+
+            if player_name in player_stats:
+                progression_score = player_stats[player_name]["scored"]
+                if bust:
+                    progression_score = player_committed[player_name]["scored"]
+                player_progression[player_name].append((player_darts_progress[player_name], progression_score))
+
+            if bust:
+                team_score[side] = team_turn_start[side]
+                if player_name in player_stats:
+                    for idx in range(1, len(current_turn_hits) + 1):
+                        x_val = player_progression[player_name][-idx][0]
+                        player_progression[player_name][-idx] = (x_val, player_committed[player_name]["scored"])
+                    reset_pending(player_name, side)
+                    sync_display(player_name, side)
+                current_turn_player = None
+                current_turn_side = None
+                current_turn_hits = []
+            else:
+                if player_name in player_stats and (len(current_turn_hits) == 3 or winning_checkout):
+                    commit_turn(player_name, side)
+                    if len(current_turn_hits) == 3:
+                        completed_turns[player_name].append(current_turn_hits.copy())
+                    current_turn_player = None
+                    current_turn_side = None
+                    current_turn_hits = []
+
             distribution_points[side].append(
                 {
                     "x": hit["x"],
@@ -535,9 +649,11 @@ class DartsApp:
         for player_name, stats in player_stats.items():
             turns = self.score_history_cache.get(player_name, [0])
             stats["avg"] = (stats["scored"] * 3 / stats["darts"]) if stats["darts"] else 0.0
-            stats["ton_plus"] = sum(1 for score in turns if score >= 50)
-            stats["oneforty_plus"] = sum(1 for score in turns if score >= 100)
-            stats["oneeighty"] = sum(1 for score in turns if score >= 150)
+            stats["score_50_plus"] = sum(1 for score in turns if score >= 50)
+            stats["score_75_plus"] = sum(1 for score in turns if score >= 75)
+            stats["score_100_plus"] = sum(1 for score in turns if score >= 100)
+            player_turns = completed_turns.get(player_name, [])
+            stats["previous_grouping"] = self.previous_turn_grouping(player_turns[-1]) if player_turns else 0.0
 
         for side in (0, 1):
             team_stats[side]["avg"] = (
@@ -1266,8 +1382,9 @@ class DartsApp:
                 left + 8,
                 top_y + 24,
                 [
-                    ("Avg", f"{team['avg']:.2f}"),
-                    ("Bull", team["bulls"]),
+                    ("AVG", f"{team['avg']:.2f}"),
+                    ("B", team["bulls"]),
+                    ("D", team["doubles"]),
                     ("T", team["triples"]),
                 ],
                 ("Arial", 10, "bold"),
@@ -1291,7 +1408,9 @@ class DartsApp:
                     [
                         ("dt", player["darts"]),
                         ("Pts", player["scored"]),
-                        ("Avg", f"{player['avg']:.2f}"),
+                        ("AVG", f"{player['avg']:.2f}"),
+                        ("B", player["bulls"]),
+                        ("D", player["doubles"]),
                     ],
                     ("Arial", 9, "bold"),
                     ("Arial", 9),
@@ -1302,9 +1421,11 @@ class DartsApp:
                     left + 8,
                     y + 39,
                     [
-                        ("50+", player["ton_plus"]),
-                        ("100+", player["oneforty_plus"]),
-                        ("150+", player["oneeighty"]),
+                        ("T", player["triples"]),
+                        ("Grp", f"{player['previous_grouping']:.1f}"),
+                        ("50+", player["score_50_plus"]),
+                        ("75+", player["score_75_plus"]),
+                        ("100+", player["score_100_plus"]),
                     ],
                     ("Arial", 9, "bold"),
                     ("Arial", 9),
