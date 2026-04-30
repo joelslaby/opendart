@@ -920,7 +920,7 @@ class DartsApp:
             next_player = self.game.active_player()
             c.create_text(
                 10,
-                150,
+                140,
                 anchor="w",
                 text=f"Next player: {next_player.name}",
                 font=("Arial",30,"bold"),
@@ -928,7 +928,7 @@ class DartsApp:
             )
             c.create_text(
                 panel_width*2 - 10,
-                150,
+                140,
                 anchor="e",
                 text=self.team_name_for_player(next_player),
                 font=("Arial",30,"bold"),
@@ -936,7 +936,7 @@ class DartsApp:
             )
             c.create_text(
                 10,
-                150,
+                140,
                 anchor="w",
                 text=f"Next player:",
                 font=("Arial",30,"bold"),
