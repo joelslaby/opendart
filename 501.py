@@ -1398,9 +1398,9 @@ class DartsApp:
                 player_text = self.contrast_text_color(STATS_BG)
                 c.create_text(left + 8, y + 7, anchor="nw", text=player["name"], font=("Arial", 12, "bold"), fill=player_colors.get(player["name"], team_color))
                 if player["name"] == active_player:
-                    badge_w = 42
-                    c.create_rectangle(right - badge_w - 8, y + 7, right - 8, y + 21, fill=SCOREBOARD_HIGHLIGHT, outline="")
-                    c.create_text(right - badge_w / 2 - 8, y + 14, text="LIVE", font=("Arial", 8, "bold"), fill="white")
+                    badge_w = 80
+                    c.create_rectangle(right - badge_w-2, y + 7, right - 12, y + 21, fill=SCOREBOARD_HIGHLIGHT, outline="")
+                    c.create_text(right - badge_w / 2 - 8, y + 14, text="THROWING", font=("Arial", 8, "bold"), fill="white")
                 self.draw_inline_stats(
                     c,
                     left + 8,
