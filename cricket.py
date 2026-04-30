@@ -51,7 +51,7 @@ TEXT_LIGHT = "#f5f1ea"
 
 
 class DartsApp:
-    def __init__(self, root, on_back=None, initial_mode="teams"):
+    def __init__(self, root, on_back=None, initial_mode="2v2"):
         self.root = root
         self.on_back = on_back
         root.title("Cricket Darts")
@@ -60,7 +60,6 @@ class DartsApp:
         y = root.winfo_height()
 
         self.folder_path, self.player_options = load_app_config(CONFIG_FILE)
-        self.mode_var = tk.StringVar(value="teams")
         self.game = None
 
         self.folder_path_var = tk.StringVar(
@@ -156,19 +155,6 @@ class DartsApp:
             side=tk.TOP, pady=5
         )
 
-        mode_frame = tk.Frame(root)
-        mode_frame.place(x=10, y=770)
-        tk.Label(mode_frame, text="Format:", font=("Arial", 20)).pack(side=tk.LEFT, padx=5)
-        ttk.Combobox(
-            mode_frame,
-            textvariable=self.mode_var,
-            values=["teams", "solo"],
-            font=("Arial", 18),
-            state="readonly",
-            width=8,
-        ).pack(side=tk.LEFT)
-        self.mode_var.trace_add("write", self.handle_mode_change)
-
         self.team1a_player_var = tk.StringVar(value=self.player_options[0])
         self.team1b_player_var = tk.StringVar(value=self.player_options[1])
         self.team2a_player_var = tk.StringVar(value=self.player_options[2])
@@ -236,6 +222,18 @@ class DartsApp:
         self.swap_teams_button.pack(side=tk.LEFT)
         tk.Button(btn_frame6, text="Add Player", font=("Arial", 20), command=self.add_player).pack(side=tk.LEFT)
 
+        self.mode_var = tk.StringVar(value="2v2")
+        ttk.Combobox(
+            btn_frame6,
+            textvariable=self.mode_var,
+            values=["2v2", "1v1"],
+            font=("Arial", 18),
+            state="readonly",
+            width=8,
+        ).pack(side=tk.LEFT)
+        self.mode_var.trace_add("write", self.handle_mode_change)
+
+
         self.dart_markers_0 = []
         self.dart_markers_1 = []
         self.dart_history = []
@@ -244,7 +242,7 @@ class DartsApp:
         self.set_game_mode(initial_mode, preserve_names=False)
 
     def is_solo_mode(self):
-        return self.mode_var.get() == "solo"
+        return self.mode_var.get() == "1v1"
 
     def current_hit_class(self):
         return SoloHit if self.is_solo_mode() else TeamHit
@@ -300,10 +298,10 @@ class DartsApp:
     def set_game_mode(self, mode, preserve_names=True):
         existing_names = self.team_names_from_vars() if preserve_names else None
         self.mode_var.set(mode)
-        self.game = SoloCricketGame() if mode == "solo" else TeamCricketGame()
+        self.game = SoloCricketGame() if mode == "1v1" else TeamCricketGame()
 
         if preserve_names and existing_names:
-            if mode == "solo":
+            if mode == "1v1":
                 solo_names = [existing_names[0][0], existing_names[1][0]]
                 self.team1a_player_var.set(solo_names[0])
                 self.team2a_player_var.set(solo_names[1])
@@ -319,7 +317,7 @@ class DartsApp:
         if self.game is None:
             return
         new_mode = self.mode_var.get()
-        expected_mode = "solo" if self.is_solo_mode() else "teams"
+        expected_mode = "1v1" if self.is_solo_mode() else "2v2"
         if new_mode != expected_mode:
             return
         self.set_game_mode(new_mode)
@@ -830,7 +828,7 @@ class DartsApp:
 
         self.dart_history = load_dart_history(file_path)
         turn_order = infer_player_turn_order(self.dart_history, 4)
-        mode = "solo" if len(turn_order) <= 2 else "teams"
+        mode = "1v1" if len(turn_order) <= 2 else "2v2"
         self.set_game_mode(mode, preserve_names=False)
 
         for player in turn_order:

@@ -50,9 +50,9 @@ class DartsLauncher:
         if game_key == "501":
             self.current_app = five01_module.DartsApp(self.root, on_back=self.show_menu)
         elif game_key == "cricket":
-            self.current_app = cricket_module.DartsApp(self.root, on_back=self.show_menu, initial_mode="teams")
+            self.current_app = cricket_module.DartsApp(self.root, on_back=self.show_menu, initial_mode="2v2")
         elif game_key == "cricket_solo":
-            self.current_app = cricket_module.DartsApp(self.root, on_back=self.show_menu, initial_mode="solo")
+            self.current_app = cricket_module.DartsApp(self.root, on_back=self.show_menu, initial_mode="1v1")
         else:
             raise ValueError(f"Unknown game: {game_key}")
 
