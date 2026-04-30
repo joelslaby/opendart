@@ -20,7 +20,6 @@ from dart_engine.ui_common import (
     infer_player_turn_order,
     load_app_config,
     load_dart_history,
-    replay_dart_history,
     save_dart_history,
     update_app_config,
 )
@@ -83,7 +82,6 @@ class DartsApp:
         self.score_history_cache = {}
         self.stats_cache = {}
         self.stats_board_photos = {}
-        self.last_replayed_team = None
         self.stats_view_var = tk.StringVar(value="Shot Map")
         self.winner_dialog_shown = False
 
@@ -240,6 +238,10 @@ class DartsApp:
         if number is None:
             return
 
+        # Keep the completed 3-dart turn visible until the next dart starts.
+        if self.game.darts_in_turn == 0 and (self.dart_markers_0 or self.dart_markers_1):
+            self.clear_all_darts()
+
         # draw red dot
         throwing_team = self.game.current_team
         if throwing_team == 0:
@@ -271,10 +273,6 @@ class DartsApp:
 
         self.game.register_hit(Hit(number,mult, (event.x, event.y)),self.dart_history)
 
-        # reset board after 3 darts
-        if self.game.darts_in_turn == 0:
-            self.clear_team_darts(throwing_team)
-
         self.refresh_caches()
         self.update_label()
         self.prompt_save_on_winner()
@@ -302,19 +300,18 @@ class DartsApp:
         marker_list.append(dot)
 
     def register_history_hit(self, hit):
-        self.last_replayed_team = hit["team"]
         self.game.register_hit(Hit(hit["number"], hit["multiplier"], (hit["x"], hit["y"])))
 
     def replay_history(self):
-        replay_dart_history(
-            self.dart_history,
-            reset_game=self.game.reset,
-            clear_all_markers=self.clear_all_darts,
-            draw_marker=lambda hit: self.draw_current_dart_marker(hit["x"], hit["y"]),
-            register_hit=self.register_history_hit,
-            clear_turn_markers=lambda: self.clear_team_darts(self.last_replayed_team),
-            is_turn_complete=lambda: self.game.darts_in_turn == 0,
-        )
+        self.game.reset()
+        self.clear_all_darts()
+
+        for hit in self.dart_history:
+            if self.game.darts_in_turn == 0 and (self.dart_markers_0 or self.dart_markers_1):
+                self.clear_all_darts()
+            self.draw_current_dart_marker(hit["x"], hit["y"])
+            self.register_history_hit(hit)
+
         self.refresh_caches()
         self.update_label()
         self.winner_dialog_shown = False
@@ -1103,8 +1100,9 @@ class DartsApp:
         rec_size_y = 60
 
         score = self.game.score_for_player(self.game.active_player())
-
-        hits = get_recommended_hits(self.game.darts_in_turn,score)
+        darts_used = self.game.darts_in_turn
+        darts_left = 3 if darts_used == 0 else 3 - darts_used
+        hits = get_recommended_hits(darts_left, score)
 
         for hh, hit in enumerate(hits):
             c.create_rectangle(
