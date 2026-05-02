@@ -21,9 +21,9 @@ class Player:
 
 
 class Team:
-    def __init__(self, name, p1, p2):
+    def __init__(self, name, *player_names):
         self.name = name
-        self.players = [Player(p1), Player(p2)]
+        self.players = [Player(player_name) for player_name in player_names]
         self.score = 501
 
     def get_player_by_name(self, name):
@@ -37,11 +37,18 @@ class Team:
 
 
 class Game501:
-    def __init__(self):
-        self.teams = [
-            Team("1236", "Jacob", "Joel"),
-            Team("930", "Dustin", "Ravi"),
-        ]
+    def __init__(self, mode="2v2"):
+        self.mode = mode
+        if mode == "1v1":
+            self.teams = [
+                Team("Team 1", "Jacob"),
+                Team("Team 2", "Dustin"),
+            ]
+        else:
+            self.teams = [
+                Team("1236", "Jacob", "Joel"),
+                Team("930", "Dustin", "Ravi"),
+            ]
         self.reset()
 
     def active_player(self):
@@ -53,12 +60,19 @@ class Game501:
     def all_players(self):
         return [player for team in self.teams for player in team.players]
 
+    def turn_order_slots(self):
+        slots = []
+        max_players = max((len(team.players) for team in self.teams), default=0)
+        for player_index in range(max_players):
+            for team_index, team in enumerate(self.teams):
+                if player_index < len(team.players):
+                    slots.append((team_index, player_index))
+        return slots
+
     def players_by_turn_order(self):
         return [
-            self.teams[0].players[0],
-            self.teams[1].players[0],
-            self.teams[0].players[1],
-            self.teams[1].players[1],
+            self.teams[team_index].players[player_index]
+            for team_index, player_index in self.turn_order_slots()
         ]
 
     def rotated_turn_order(self, start_player=None):
@@ -97,6 +111,8 @@ class Game501:
 
     def swap_team_players(self, team_index):
         team = self.teams[team_index]
+        if len(team.players) < 2:
+            return
         team.players[0], team.players[1] = team.players[1], team.players[0]
 
     def swap_teams(self):
@@ -111,9 +127,9 @@ class Game501:
 
     def next_turn(self):
         self.darts_in_turn = 0
-        self.next_player = (self.next_player + 1) % 4
-        self.current_team = self.next_player % 2
-        self.current_player = self.next_player // 2
+        order = self.turn_order_slots()
+        self.next_player = (self.next_player + 1) % len(order)
+        self.current_team, self.current_player = order[self.next_player]
         self.turn_start_score = self.teams[self.current_team].score
 
     def register_hit(self, hit: Hit, hist=None):

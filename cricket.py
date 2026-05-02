@@ -322,18 +322,19 @@ class DartsApp:
             self.swap_team_1_button.pack_forget()
             self.swap_team_2_button.pack_forget()
         else:
-            if not self.team1_name_button.winfo_manager():
-                self.team1_name_button.pack(side=tk.LEFT, padx=(5, 6))
-            if not self.team2_name_button.winfo_manager():
-                self.team2_name_button.pack(side=tk.LEFT, padx=(5, 6))
-            if not self.dropdown_1b.winfo_manager():
-                self.dropdown_1b.pack(side=tk.LEFT)
-            if not self.dropdown_2b.winfo_manager():
-                self.dropdown_2b.pack(side=tk.LEFT)
-            if not self.swap_team_1_button.winfo_manager():
-                self.swap_team_1_button.pack(side=tk.LEFT)
-            if not self.swap_team_2_button.winfo_manager():
-                self.swap_team_2_button.pack(side=tk.LEFT)
+            for widget in (self.team1_name_button, self.dropdown_1a, self.dropdown_1b, self.swap_team_1_button):
+                widget.pack_forget()
+            self.team1_name_button.pack(side=tk.LEFT, padx=(5, 6))
+            self.dropdown_1a.pack(side=tk.LEFT)
+            self.dropdown_1b.pack(side=tk.LEFT)
+            self.swap_team_1_button.pack(side=tk.LEFT)
+
+            for widget in (self.team2_name_button, self.dropdown_2a, self.dropdown_2b, self.swap_team_2_button):
+                widget.pack_forget()
+            self.team2_name_button.pack(side=tk.LEFT, padx=(5, 6))
+            self.dropdown_2a.pack(side=tk.LEFT)
+            self.dropdown_2b.pack(side=tk.LEFT)
+            self.swap_team_2_button.pack(side=tk.LEFT)
 
     def set_game_mode(self, mode, preserve_names=True):
         existing_names = self.team_names_from_vars() if preserve_names else None

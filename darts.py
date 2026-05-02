@@ -42,13 +42,16 @@ class DartsLauncher:
         tk.Label(frame, text="Choose Game", font=("Arial", 36, "bold")).pack(pady=20)
         tk.Button(frame, text="Cricket", font=("Arial", 28), width=16, command=lambda: self.launch_game("cricket")).pack(pady=10)
         tk.Button(frame, text="501", font=("Arial", 28), width=16, command=lambda: self.launch_game("501")).pack(pady=10)
+        tk.Button(frame, text="501 1v1", font=("Arial", 28), width=16, command=lambda: self.launch_game("501_solo")).pack(pady=10)
         tk.Button(frame, text="Cricket 1v1", font=("Arial", 28), width=16, command=lambda: self.launch_game("cricket_solo")).pack(pady=10)
         tk.Button(frame, text="Quit", font=("Arial", 22), width=16, command=self.root.destroy).pack(pady=(24, 0))
 
     def launch_game(self, game_key):
         self.clear_root()
         if game_key == "501":
-            self.current_app = five01_module.DartsApp(self.root, on_back=self.show_menu)
+            self.current_app = five01_module.DartsApp(self.root, on_back=self.show_menu, initial_mode="2v2")
+        elif game_key == "501_solo":
+            self.current_app = five01_module.DartsApp(self.root, on_back=self.show_menu, initial_mode="1v1")
         elif game_key == "cricket":
             self.current_app = cricket_module.DartsApp(self.root, on_back=self.show_menu, initial_mode="2v2")
         elif game_key == "cricket_solo":
