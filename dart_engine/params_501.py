@@ -40,15 +40,13 @@ class Game501:
     def __init__(self, mode="2v2"):
         self.mode = mode
         if mode == "1v1":
-            self.teams = [
-                Team("Team 1", "Jacob"),
-                Team("Team 2", "Dustin"),
-            ]
+            self.teams = [Team("Jacob", "Jacob"), Team("Dustin", "Dustin")]
+        elif mode == "3p":
+            self.teams = [Team("Jacob", "Jacob"), Team("Joel", "Joel"), Team("Dustin", "Dustin")]
+        elif mode == "4p":
+            self.teams = [Team("Jacob", "Jacob"), Team("Joel", "Joel"), Team("Dustin", "Dustin"), Team("Ravi", "Ravi")]
         else:
-            self.teams = [
-                Team("1236", "Jacob", "Joel"),
-                Team("930", "Dustin", "Ravi"),
-            ]
+            self.teams = [Team("1236", "Jacob", "Joel"), Team("930", "Dustin", "Ravi")]
         self.reset()
 
     def active_player(self):
@@ -116,6 +114,8 @@ class Game501:
         team.players[0], team.players[1] = team.players[1], team.players[0]
 
     def swap_teams(self):
+        if len(self.teams) < 2:
+            return
         self.teams[0], self.teams[1] = self.teams[1], self.teams[0]
 
     def get_player_by_name(self, name):
