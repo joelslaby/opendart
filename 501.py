@@ -12,7 +12,7 @@ from matplotlib.figure import Figure
 from matplotlib.ticker import AutoMinorLocator, LinearLocator
 
 from dart_engine.helpers_501 import get_recommended_hits
-from dart_engine.helpers_general import interpret_click, swap_players_history, swap_teams_history
+from dart_engine.helpers_general import classify_miss_zone, interpret_click, swap_players_history, swap_teams_history
 from dart_engine.player_ui import build_recent_player_turn_summary, format_hit_label, get_profile_pic_path
 from dart_engine.ui_common import (
     add_player_option,
@@ -263,6 +263,7 @@ class DartsApp:
 
         # save dart data
         player = self.game.active_player()
+        miss_zone = classify_miss_zone(event.x, event.y) if number == 0 else {"offboard": False, "bounce_out": False}
 
         self.dart_history.append({
             "player": player.name,
@@ -270,7 +271,9 @@ class DartsApp:
             "x": event.x,
             "y": event.y,
             "number": number,
-            "multiplier": mult
+            "multiplier": mult,
+            "offboard": miss_zone["offboard"] or (number == 0 and not miss_zone["bounce_out"]),
+            "bounce_out": miss_zone["bounce_out"],
         })
 
         self.game.register_hit(Hit(number,mult, (event.x, event.y)),self.dart_history)
@@ -588,6 +591,7 @@ class DartsApp:
                 "darts": 0,
                 "scored": 0,
                 "bulls": 0,
+                "offboard": 0,
                 "doubles": 0,
                 "triples": 0,
                 "score_50_plus": 0,
@@ -604,6 +608,7 @@ class DartsApp:
                 "darts": 0,
                 "scored": 0,
                 "bulls": 0,
+                "offboard": 0,
                 "doubles": 0,
                 "triples": 0,
             }
@@ -632,6 +637,7 @@ class DartsApp:
                 "darts": 0,
                 "scored": 0,
                 "bulls": 0,
+                "offboard": 0,
                 "doubles": 0,
                 "triples": 0,
             }
@@ -642,6 +648,7 @@ class DartsApp:
                 "darts": 0,
                 "scored": 0,
                 "bulls": 0,
+                "offboard": 0,
                 "doubles": 0,
                 "triples": 0,
             }
@@ -652,6 +659,7 @@ class DartsApp:
                 "darts": 0,
                 "scored": 0,
                 "bulls": 0,
+                "offboard": 0,
                 "doubles": 0,
                 "triples": 0,
             }
@@ -662,6 +670,7 @@ class DartsApp:
                 "darts": 0,
                 "scored": 0,
                 "bulls": 0,
+                "offboard": 0,
                 "doubles": 0,
                 "triples": 0,
             }
@@ -680,12 +689,12 @@ class DartsApp:
                 team_pending[side][field] = 0
 
         def sync_display(player_name, side):
-            for field in ("darts", "scored", "bulls", "doubles", "triples"):
+            for field in ("darts", "scored", "bulls", "offboard", "doubles", "triples"):
                 player_stats[player_name][field] = player_committed[player_name][field] + player_pending[player_name][field]
                 team_stats[side][field] = team_committed[side][field] + team_pending[side][field]
 
         def commit_turn(player_name, side):
-            for field in ("darts", "scored", "bulls", "doubles", "triples"):
+            for field in ("darts", "scored", "bulls", "offboard", "doubles", "triples"):
                 player_committed[player_name][field] += player_pending[player_name][field]
                 team_committed[side][field] += team_pending[side][field]
             reset_pending(player_name, side)
@@ -709,11 +718,13 @@ class DartsApp:
                 player_pending[player_name]["darts"] += 1
                 player_pending[player_name]["scored"] += points
                 player_pending[player_name]["bulls"] += 1 if hit["number"] == 25 else 0
+                player_pending[player_name]["offboard"] += 1 if hit["number"] == 0 else 0
                 player_pending[player_name]["doubles"] += 1 if hit["multiplier"] == 2 else 0
                 player_pending[player_name]["triples"] += 1 if hit["multiplier"] == 3 else 0
                 team_pending[side]["darts"] += 1
                 team_pending[side]["scored"] += points
                 team_pending[side]["bulls"] += 1 if hit["number"] == 25 else 0
+                team_pending[side]["offboard"] += 1 if hit["number"] == 0 else 0
                 team_pending[side]["doubles"] += 1 if hit["multiplier"] == 2 else 0
                 team_pending[side]["triples"] += 1 if hit["multiplier"] == 3 else 0
                 sync_display(player_name, side)
@@ -1446,7 +1457,14 @@ class DartsApp:
         c.create_line(canvas_size/2,canvas_size/2-line_size/2,canvas_size/2,canvas_size/2+line_size/2,width=4,fill=active_color)
 
         number, mult = interpret_click(x,y)
-        c.create_text(canvas_size/2+75, canvas_size/2, text=format_hit_label(number, mult), fill=active_color, font=("Arial",40,"bold"))
+        miss_zone = classify_miss_zone(x, y)
+        if miss_zone["bounce_out"]:
+            hover_label = "BO"
+        elif miss_zone["offboard"]:
+            hover_label = "OB"
+        else:
+            hover_label = format_hit_label(number, mult)
+        c.create_text(canvas_size/2+75, canvas_size/2, text=hover_label, fill=active_color, font=("Arial",40,"bold"))
 
     def draw_statsboard(self):
         c = self.stats_canvas
@@ -1506,6 +1524,7 @@ class DartsApp:
                 [
                     ("AVG", f"{team['avg']:.2f}"),
                     ("B", team["bulls"]),
+                    ("OB", team["offboard"]),
                     ("D", team["doubles"]),
                     ("T", team["triples"]),
                 ],
@@ -1533,6 +1552,7 @@ class DartsApp:
                         ("AVG", f"{player['avg']:.2f}"),
                         ("B", player["bulls"]),
                         ("D", player["doubles"]),
+                        ("T", player["triples"]),
                     ],
                     ("Arial", 9, "bold"),
                     ("Arial", 9),
@@ -1543,7 +1563,7 @@ class DartsApp:
                     left + 8,
                     y + 39,
                     [
-                        ("T", player["triples"]),
+                        ("OB", player["offboard"]),
                         ("AGI", f"{player['previous_grouping']:.1f}"),
                         ("50+", player["score_50_plus"]),
                         ("75+", player["score_75_plus"]),

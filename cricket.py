@@ -13,6 +13,7 @@ from matplotlib.ticker import AutoMinorLocator, LinearLocator
 from dart_engine.helpers_cricket import cricket_marks
 from dart_engine.cricket_stats import build_all_cricket_marks_by_turn
 from dart_engine.helpers_general import (
+    classify_miss_zone,
     get_screen_size_tkinter,
     interpret_click,
     swap_players_history,
@@ -359,6 +360,7 @@ class DartsApp:
         )
 
         player = self.game.active_player()
+        miss_zone = classify_miss_zone(event.x, event.y) if number == 0 else {"offboard": False, "bounce_out": False}
         self.dart_history.append(
             {
                 "player": player.name,
@@ -367,6 +369,8 @@ class DartsApp:
                 "y": event.y,
                 "number": number,
                 "multiplier": mult,
+                "offboard": miss_zone["offboard"] or (number == 0 and not miss_zone["bounce_out"]),
+                "bounce_out": miss_zone["bounce_out"],
             }
         )
 
@@ -722,6 +726,7 @@ class DartsApp:
                 "marks": 0,
                 "scoring_hits": 0,
                 "bulls": 0,
+                "offboard": 0,
                 "doubles": 0,
                 "triples": 0,
                 "points": 0,
@@ -742,6 +747,7 @@ class DartsApp:
                 "marks": 0,
                 "scoring_hits": 0,
                 "bulls": 0,
+                "offboard": 0,
                 "doubles": 0,
                 "triples": 0,
             }
@@ -815,6 +821,7 @@ class DartsApp:
                 player_stats[player_name]["marks"] += marks_scored
                 player_stats[player_name]["scoring_hits"] += 1 if valid_mark_hit else 0
                 player_stats[player_name]["bulls"] += 1 if number == 25 and valid_mark_hit else 0
+                player_stats[player_name]["offboard"] += 1 if number == 0 else 0
                 player_stats[player_name]["doubles"] += 1 if multiplier == 2 and valid_mark_hit else 0
                 player_stats[player_name]["triples"] += 1 if multiplier == 3 and valid_mark_hit else 0
                 player_stats[player_name]["points"] += points_scored
@@ -823,6 +830,7 @@ class DartsApp:
             team_stats[side]["marks"] += marks_scored
             team_stats[side]["scoring_hits"] += 1 if valid_mark_hit else 0
             team_stats[side]["bulls"] += 1 if number == 25 and valid_mark_hit else 0
+            team_stats[side]["offboard"] += 1 if number == 0 else 0
             team_stats[side]["doubles"] += 1 if multiplier == 2 and valid_mark_hit else 0
             team_stats[side]["triples"] += 1 if multiplier == 3 and valid_mark_hit else 0
             if player_name in player_progression:
@@ -1464,7 +1472,14 @@ class DartsApp:
         c.create_line(canvas_size / 2 - line_size / 2, canvas_size / 2, canvas_size / 2 + line_size / 2, canvas_size / 2, width=4, fill=active_color)
         c.create_line(canvas_size / 2, canvas_size / 2 - line_size / 2, canvas_size / 2, canvas_size / 2 + line_size / 2, width=4, fill=active_color)
         number, mult = interpret_click(x, y)
-        c.create_text(canvas_size / 2 + 75, canvas_size / 2, text=format_hit_label(number, mult), fill=active_color, font=("Arial", 40, "bold"))
+        miss_zone = classify_miss_zone(x, y)
+        if miss_zone["bounce_out"]:
+            hover_label = "BO"
+        elif miss_zone["offboard"]:
+            hover_label = "OB"
+        else:
+            hover_label = format_hit_label(number, mult)
+        c.create_text(canvas_size / 2 + 75, canvas_size / 2, text=hover_label, fill=active_color, font=("Arial", 40, "bold"))
 
     def draw_statsboard(self):
         c = self.stats_canvas
@@ -1527,6 +1542,7 @@ class DartsApp:
                         ("M", team["marks"]),
                         ("MPR", f"{team['mpr']:.2f}"),
                         ("HIT", f"{team['hit_rate']:.0f}%"),
+                        ("OB", team["offboard"]),
                         ("D", team["doubles"]),
                         ("T", team["triples"]),
                     ],
@@ -1570,6 +1586,7 @@ class DartsApp:
                     left + 8,
                     y + 39,
                     [
+                        ("OB", player["offboard"]),
                         ("D", player["doubles"]),
                         ("T", player["triples"]),
                         ("PTS", player["points"]),

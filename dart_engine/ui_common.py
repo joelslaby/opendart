@@ -4,6 +4,8 @@ from typing import Callable
 
 from tkinter import filedialog
 
+from dart_engine.helpers_general import classify_miss_zone
+
 
 DEFAULT_PLAYERS = ["Jacob", "Joel", "Dustin", "Ravi"]
 
@@ -66,7 +68,15 @@ def save_dart_history(file_path: str, dart_history: list[dict]) -> None:
 
 def load_dart_history(file_path: str) -> list[dict]:
     with open(file_path, "r") as file:
-        return json.load(file)["dart_history"]
+        dart_history = json.load(file)["dart_history"]
+
+    for hit in dart_history:
+        if "offboard" not in hit or "bounce_out" not in hit:
+            miss_zone = classify_miss_zone(hit.get("x", -1), hit.get("y", -1)) if hit.get("number") == 0 else {"offboard": False, "bounce_out": False}
+            hit.setdefault("offboard", miss_zone["offboard"] or (hit.get("number") == 0 and not miss_zone["bounce_out"]))
+            hit.setdefault("bounce_out", miss_zone["bounce_out"])
+
+    return dart_history
 
 
 def infer_player_turn_order(dart_history: list[dict], expected_players: int) -> list[str]:
