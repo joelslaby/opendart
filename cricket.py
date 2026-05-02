@@ -32,6 +32,7 @@ from dart_engine.ui_common import (
     infer_player_turn_order,
     load_app_config,
     load_dart_history,
+    load_saved_game,
     replay_dart_history,
     save_dart_history,
     update_app_config,
@@ -172,10 +173,19 @@ class DartsApp:
         self.team1b_player_var = tk.StringVar(value=self.player_options[1])
         self.team2a_player_var = tk.StringVar(value=self.player_options[2])
         self.team2b_player_var = tk.StringVar(value=self.player_options[3])
+        self.team1_name_var = tk.StringVar(value="1236")
+        self.team2_name_var = tk.StringVar(value="930")
 
         self.team1_frame = tk.Frame(root)
         self.team1_frame.place(x=0, y=815)
-        tk.Label(self.team1_frame, text="Team 1: ", font=("Arial", 20)).pack(side=tk.LEFT, padx=5)
+        self.team1_name_button = tk.Button(
+            self.team1_frame,
+            textvariable=self.team1_name_var,
+            font=("Arial", 20),
+            command=lambda: self.prompt_team_name_change(0),
+            width=6,
+        )
+        self.team1_name_button.pack(side=tk.LEFT, padx=(5, 6))
         self.dropdown_1a = ttk.Combobox(
             self.team1_frame,
             textvariable=self.team1a_player_var,
@@ -203,7 +213,14 @@ class DartsApp:
 
         self.team2_frame = tk.Frame(root)
         self.team2_frame.place(x=0, y=850)
-        tk.Label(self.team2_frame, text="Team 2: ", font=("Arial", 20)).pack(side=tk.LEFT, padx=5)
+        self.team2_name_button = tk.Button(
+            self.team2_frame,
+            textvariable=self.team2_name_var,
+            font=("Arial", 20),
+            command=lambda: self.prompt_team_name_change(1),
+            width=6,
+        )
+        self.team2_name_button.pack(side=tk.LEFT, padx=(5, 6))
         self.dropdown_2a = ttk.Combobox(
             self.team2_frame,
             textvariable=self.team2a_player_var,
@@ -281,6 +298,8 @@ class DartsApp:
         else:
             self.game.set_team_player_names(0, team_names[0])
             self.game.set_team_player_names(1, team_names[1])
+            self.game.set_team_name(0, self.team1_name_var.get().strip() or "Team 1")
+            self.game.set_team_name(1, self.team2_name_var.get().strip() or "Team 2")
 
     def sync_player_vars_from_game(self):
         if self.is_solo_mode():
@@ -291,14 +310,22 @@ class DartsApp:
             self.team1b_player_var.set(self.game.teams[0].players[1].name)
             self.team2a_player_var.set(self.game.teams[1].players[0].name)
             self.team2b_player_var.set(self.game.teams[1].players[1].name)
+            self.team1_name_var.set(self.game.teams[0].name)
+            self.team2_name_var.set(self.game.teams[1].name)
 
     def update_mode_controls(self):
         if self.is_solo_mode():
+            self.team1_name_button.pack_forget()
+            self.team2_name_button.pack_forget()
             self.dropdown_1b.pack_forget()
             self.dropdown_2b.pack_forget()
             self.swap_team_1_button.pack_forget()
             self.swap_team_2_button.pack_forget()
         else:
+            if not self.team1_name_button.winfo_manager():
+                self.team1_name_button.pack(side=tk.LEFT, padx=(5, 6))
+            if not self.team2_name_button.winfo_manager():
+                self.team2_name_button.pack(side=tk.LEFT, padx=(5, 6))
             if not self.dropdown_1b.winfo_manager():
                 self.dropdown_1b.pack(side=tk.LEFT)
             if not self.dropdown_2b.winfo_manager():
@@ -310,6 +337,7 @@ class DartsApp:
 
     def set_game_mode(self, mode, preserve_names=True):
         existing_names = self.team_names_from_vars() if preserve_names else None
+        existing_team_names = [self.team1_name_var.get(), self.team2_name_var.get()] if preserve_names else None
         self.mode_var.set(mode)
         self.game = SoloCricketGame() if mode == "1v1" else TeamCricketGame()
 
@@ -318,6 +346,9 @@ class DartsApp:
                 solo_names = [existing_names[0][0], existing_names[1][0]]
                 self.team1a_player_var.set(solo_names[0])
                 self.team2a_player_var.set(solo_names[1])
+            elif existing_team_names:
+                self.team1_name_var.set(existing_team_names[0])
+                self.team2_name_var.set(existing_team_names[1])
             self.apply_player_vars_to_game()
 
         self.sync_player_vars_from_game()
@@ -993,21 +1024,29 @@ class DartsApp:
         if self.folder_path is None:
             self.save_as()
             return
-        save_dart_history(os.path.join(self.folder_path, filename), self.dart_history)
+        metadata = {"game_mode": self.mode_var.get()}
+        if not self.is_solo_mode():
+            metadata["team_names"] = [self.game.teams[0].name, self.game.teams[1].name]
+        save_dart_history(os.path.join(self.folder_path, filename), self.dart_history, metadata=metadata)
 
     def save_as(self):
         file_path = ask_history_save_path()
         if file_path:
-            save_dart_history(file_path, self.dart_history)
+            metadata = {"game_mode": self.mode_var.get()}
+            if not self.is_solo_mode():
+                metadata["team_names"] = [self.game.teams[0].name, self.game.teams[1].name]
+            save_dart_history(file_path, self.dart_history, metadata=metadata)
 
     def load(self):
         file_path = ask_history_load_path(self.folder_path)
         if not file_path:
             return
 
-        self.dart_history = load_dart_history(file_path)
+        saved_game = load_saved_game(file_path)
+        self.dart_history = saved_game["dart_history"]
+        metadata = saved_game.get("metadata", {})
         turn_order = infer_player_turn_order(self.dart_history, 4)
-        mode = "1v1" if len(turn_order) <= 2 else "2v2"
+        mode = metadata.get("game_mode") or ("1v1" if len(turn_order) <= 2 else "2v2")
         self.set_game_mode(mode, preserve_names=False)
 
         for player in turn_order:
@@ -1029,6 +1068,10 @@ class DartsApp:
             ]
             for var, player in zip(vars_in_order, team_order):
                 var.set(player)
+            team_names = metadata.get("team_names", [])
+            if len(team_names) >= 2:
+                self.team1_name_var.set(team_names[0])
+                self.team2_name_var.set(team_names[1])
 
         self.apply_player_vars_to_game()
         self.replay_history()
@@ -1074,6 +1117,33 @@ class DartsApp:
         self.refresh_caches()
         self.update_label()
         self.winner_dialog_shown = False
+
+    def update_team_names(self, _event=None):
+        if self.is_solo_mode():
+            return
+        team1_name = self.team1_name_var.get().strip() or "Team 1"
+        team2_name = self.team2_name_var.get().strip() or "Team 2"
+        self.team1_name_var.set(team1_name)
+        self.team2_name_var.set(team2_name)
+        self.game.set_team_name(0, team1_name)
+        self.game.set_team_name(1, team2_name)
+        self.refresh_caches()
+        self.update_label()
+        self.winner_dialog_shown = False
+
+    def prompt_team_name_change(self, team_index):
+        current_name = self.team1_name_var.get() if team_index == 0 else self.team2_name_var.get()
+        new_name = simpledialog.askstring("Team Name", "Enter team name (max 6 chars):", initialvalue=current_name)
+        if new_name is None:
+            return
+        new_name = new_name.strip()[:6]
+        if not new_name:
+            new_name = f"Team {team_index + 1}"
+        if team_index == 0:
+            self.team1_name_var.set(new_name)
+        else:
+            self.team2_name_var.set(new_name)
+        self.update_team_names()
 
     def add_player(self, dialog_popup=True, name=None):
         if dialog_popup:

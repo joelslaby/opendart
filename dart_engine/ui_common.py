@@ -61,14 +61,19 @@ def ask_history_load_path(current_folder: str | None = None) -> str | None:
     ) or None
 
 
-def save_dart_history(file_path: str, dart_history: list[dict]) -> None:
+def save_dart_history(file_path: str, dart_history: list[dict], metadata: dict | None = None) -> None:
+    payload = {"dart_history": dart_history}
+    if metadata:
+        payload["metadata"] = metadata
     with open(file_path, "w") as file:
-        json.dump({"dart_history": dart_history}, file, indent=2)
+        json.dump(payload, file, indent=2)
 
 
-def load_dart_history(file_path: str) -> list[dict]:
+def load_saved_game(file_path: str) -> dict:
     with open(file_path, "r") as file:
-        dart_history = json.load(file)["dart_history"]
+        payload = json.load(file)
+
+    dart_history = payload["dart_history"]
 
     for hit in dart_history:
         if "offboard" not in hit or "bounce_out" not in hit:
@@ -76,7 +81,13 @@ def load_dart_history(file_path: str) -> list[dict]:
             hit.setdefault("offboard", miss_zone["offboard"] or (hit.get("number") == 0 and not miss_zone["bounce_out"]))
             hit.setdefault("bounce_out", miss_zone["bounce_out"])
 
-    return dart_history
+    payload["dart_history"] = dart_history
+    payload.setdefault("metadata", {})
+    return payload
+
+
+def load_dart_history(file_path: str) -> list[dict]:
+    return load_saved_game(file_path)["dart_history"]
 
 
 def infer_player_turn_order(dart_history: list[dict], expected_players: int) -> list[str]:

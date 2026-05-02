@@ -111,6 +111,9 @@ class CricketGame:
     def set_team_player_names(self, team_index, names):
         self.teams[team_index].set_player_names(names)
 
+    def set_team_name(self, team_index, name):
+        self.teams[team_index].name = name
+
     def swap_team_players(self, team_index):
         team = self.teams[team_index]
         team.players[0], team.players[1] = team.players[1], team.players[0]
