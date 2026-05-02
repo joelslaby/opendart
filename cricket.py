@@ -8,6 +8,7 @@ from PIL import Image, ImageTk
 os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib-codex")
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
+from matplotlib.ticker import AutoMinorLocator, LinearLocator
 
 from dart_engine.helpers_cricket import cricket_marks
 from dart_engine.cricket_stats import build_all_cricket_marks_by_turn
@@ -138,7 +139,7 @@ class DartsApp:
         self.stats_view_menu = ttk.Combobox(
             root,
             textvariable=self.stats_view_var,
-            values=["Shot Map", "Score Plot"],
+            values=["Shot Map", "Score Plot", "Grouping Plot"],
             font=("Arial", 14),
             state="readonly",
             width=11,
@@ -438,10 +439,30 @@ class DartsApp:
 
     def previous_turn_grouping(self, turn_hits):
         if len(turn_hits) < 2:
+            return 100.0
+
+        max_spread = 0.0
+        for idx, hit_a in enumerate(turn_hits):
+            for hit_b in turn_hits[idx + 1:]:
+                spread = hypot(hit_a["x"] - hit_b["x"], hit_a["y"] - hit_b["y"])
+                if spread > max_spread:
+                    max_spread = spread
+
+        # Calibrate against the scoring area rather than the full image bounds so
+        # wide misses trend much closer to 0 AGI.
+        max_effective_spread = self.size * 0.8
+        if max_effective_spread == 0:
+            return 100.0
+
+        agi = 100.0 * (1.0 - max_spread / max_effective_spread)
+        return max(0.0, min(100.0, agi))
+
+    def turn_bull_accuracy(self, turn_hits):
+        if not turn_hits:
             return 0.0
-        center_x = sum(hit["x"] for hit in turn_hits) / len(turn_hits)
-        center_y = sum(hit["y"] for hit in turn_hits) / len(turn_hits)
-        return sum(hypot(hit["x"] - center_x, hit["y"] - center_y) for hit in turn_hits) / len(turn_hits)
+        bull_x = self.size / 2
+        bull_y = self.size / 2
+        return sum(hypot(hit["x"] - bull_x, hit["y"] - bull_y) for hit in turn_hits) / len(turn_hits)
 
     def scoring_objects_for_side(self, side):
         if self.is_solo_mode():
@@ -582,6 +603,95 @@ class DartsApp:
         image = Image.frombuffer("RGBA", canvas.get_width_height(), rgba, "raw", "RGBA", 0, 1)
         return ImageTk.PhotoImage(image)
 
+    def render_cricket_grouping_plot(self, size, player_names, grouping_progression, bull_accuracy_progression, player_colors, text_color, bg_color):
+        bg_color = "#ffffff"
+        text_color = "#000000"
+        fig = Figure(figsize=(size / 100, size / 100), dpi=100, facecolor=bg_color)
+        ax_left = fig.add_subplot(111)
+        ax_right = ax_left.twinx()
+        ax_left.set_facecolor(bg_color)
+        ax_right.set_facecolor("none")
+
+        legend_handles = []
+        legend_labels = []
+        for name in player_names:
+            grouping_series = grouping_progression.get(name, [])
+            bull_series = bull_accuracy_progression.get(name, [])
+            color = player_colors.get(name, "#000000")
+            if grouping_series:
+                x_vals = [point[0] for point in grouping_series]
+                y_vals = [point[1] for point in grouping_series]
+                handle = ax_left.plot(x_vals, y_vals, color=color, linewidth=2.5, marker="o", markersize=3)[0]
+            else:
+                handle = ax_left.plot([], [], color=color, linewidth=2.5)[0]
+            if bull_series:
+                bull_x = [point[0] for point in bull_series]
+                bull_y = [point[1] for point in bull_series]
+                ax_right.plot(bull_x, bull_y, color=color, linewidth=2.0, linestyle="--")
+            legend_handles.append(handle)
+            legend_labels.append(name)
+
+        legend_handles = [
+            ax_left.plot([], [], color="#000000", linewidth=2.5)[0],
+            ax_left.plot([], [], color="#000000", linewidth=2.0, linestyle="--")[0],
+            *legend_handles,
+        ]
+        legend_labels = ["AGI", "Bull Dist", *legend_labels]
+
+        ax_left.legend(
+            legend_handles,
+            legend_labels,
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.2),
+            frameon=False,
+            fontsize=7,
+            ncol=2,
+        )
+
+        max_turn = max(
+            [point[0] for series in grouping_progression.values() for point in series]
+            + [point[0] for series in bull_accuracy_progression.values() for point in series]
+            + [1]
+        )
+        max_bull_distance = max(
+            [point[1] for series in bull_accuracy_progression.values() for point in series]
+            + [1.0]
+        )
+
+        ax_left.set_xlim(1, max_turn if max_turn > 1 else 2)
+        ax_left.set_ylim(0, 100)
+        ax_right.set_ylim(0, max_bull_distance * 1.05 if max_bull_distance > 0 else 1.0)
+
+        ax_left.yaxis.set_major_locator(LinearLocator(6))
+        ax_right.yaxis.set_major_locator(LinearLocator(6))
+        ax_left.yaxis.set_minor_locator(AutoMinorLocator(2))
+        ax_right.yaxis.set_minor_locator(AutoMinorLocator(2))
+
+        ax_left.grid(True, axis="y", which="major", linestyle="--", linewidth=0.6, alpha=0.35, color=text_color)
+        ax_left.grid(True, axis="y", which="minor", linestyle=":", linewidth=0.45, alpha=0.2, color=text_color)
+        ax_left.set_xlabel("Turn", color=text_color, fontsize=8)
+        ax_left.set_ylabel("AGI", color=text_color, fontsize=8, fontweight="bold")
+        ax_right.set_ylabel("Bull Dist", color=text_color, fontsize=8, fontweight="bold")
+        ax_left.xaxis.labelpad = 2
+        ax_left.yaxis.labelpad = 2
+        ax_right.yaxis.labelpad = 2
+        ax_left.tick_params(axis="x", colors=text_color, labelsize=8)
+        ax_left.tick_params(axis="y", colors=text_color, labelsize=8)
+        ax_right.tick_params(axis="y", colors=text_color, labelsize=8)
+        for spine in ("bottom", "left"):
+            ax_left.spines[spine].set_color(text_color)
+        ax_left.spines["top"].set_visible(False)
+        ax_right.spines["top"].set_visible(False)
+        ax_right.spines["left"].set_visible(False)
+        ax_right.spines["right"].set_color(text_color)
+        fig.subplots_adjust(left=0.24, right=0.78, bottom=0.3, top=0.93)
+
+        canvas = FigureCanvasAgg(fig)
+        canvas.draw()
+        rgba = canvas.buffer_rgba()
+        image = Image.frombuffer("RGBA", canvas.get_width_height(), rgba, "raw", "RGBA", 0, 1)
+        return ImageTk.PhotoImage(image)
+
     def get_player_mark_history(self, player):
         player_name = player.name if hasattr(player, "name") else player
         return self.mark_history_cache.get(player_name, [0])
@@ -653,6 +763,8 @@ class DartsApp:
             player.name: {"marks": [(0, 0)], "points": [(0, 0)]}
             for player in players
         }
+        grouping_progression = {player.name: [] for player in players}
+        bull_accuracy_progression = {player.name: [] for player in players}
         completed_turns = {player.name: [] for player in players}
         current_turn_player = None
         current_turn_hits = []
@@ -663,6 +775,11 @@ class DartsApp:
         player_marks_total = {player.name: 0 for player in players}
         player_points_total = {player.name: 0 for player in players}
         player_darts_progress = {player.name: 0 for player in players}
+        grouping_turn_index = {player.name: 0 for player in players}
+
+        def side_numbers_closed(side):
+            return all(team_remaining[side][number] == 0 for number in CRICKET_NUMBERS if number != 25)
+
         for hit in self.dart_history:
             player_name = hit["player"]
             side = self.game.team_index_for_player(player_name) if player_name in player_stats else hit.get("team", 0)
@@ -723,8 +840,18 @@ class DartsApp:
                 }
             )
 
-        if current_turn_player in completed_turns and len(current_turn_hits) == 3:
-            completed_turns[current_turn_player].append(current_turn_hits)
+            if len(current_turn_hits) == 3:
+                completed_turns[player_name].append(current_turn_hits.copy())
+                if side_numbers_closed(side):
+                    grouping_turn_index[player_name] += 1
+                    grouping_progression[player_name].append(
+                        (grouping_turn_index[player_name], self.previous_turn_grouping(current_turn_hits))
+                    )
+                    bull_accuracy_progression[player_name].append(
+                        (grouping_turn_index[player_name], self.turn_bull_accuracy(current_turn_hits))
+                    )
+                current_turn_player = None
+                current_turn_hits = []
 
         for stats in player_stats.values():
             stats["mpr"] = (stats["marks"] * 3 / stats["darts"]) if stats["darts"] else 0.0
@@ -767,6 +894,8 @@ class DartsApp:
             "teams": [team_stats[0], team_stats[1]],
             "distribution": distribution_points,
             "player_progression": player_progression,
+            "grouping_progression": grouping_progression,
+            "bull_accuracy_progression": bull_accuracy_progression,
             "plot_limits": plot_limits,
             "team_players": team_players,
             "player_colors": player_color_lookup,
@@ -1350,6 +1479,8 @@ class DartsApp:
         teams = self.stats_cache.get("teams", [])
         distribution = self.stats_cache.get("distribution", {0: [], 1: []})
         player_progression = self.stats_cache.get("player_progression", {})
+        grouping_progression = self.stats_cache.get("grouping_progression", {})
+        bull_accuracy_progression = self.stats_cache.get("bull_accuracy_progression", {})
         player_colors = self.stats_cache.get("player_colors", {})
         active_player = self.stats_cache.get("active_player", "")
         surface_text = self.contrast_text_color(c.cget("bg"))
@@ -1442,7 +1573,7 @@ class DartsApp:
                         ("D", player["doubles"]),
                         ("T", player["triples"]),
                         ("PTS", player["points"]),
-                        ("GRP", f"{player['previous_grouping']:.1f}"),
+                        ("AGI", f"{player['previous_grouping']:.1f}"),
                     ],
                     ("Arial", 9, "bold"),
                     ("Arial", 9),
@@ -1471,7 +1602,7 @@ class DartsApp:
                     c.create_oval(legend_x, legend_y + 2, legend_x + 8, legend_y + 10, fill=color, outline="")
                     c.create_text(legend_x + 12, legend_y, anchor="nw", text=player["name"], font=("Arial", 9, "bold"), fill=surface_text)
                     legend_x += max(48, 16 + len(player["name"]) * 7)
-            else:
+            elif current_view == "Score Plot":
                 self.stats_board_photos[side] = self.render_cricket_progress_plot(
                     board_size,
                     [player["name"] for player in team_players],
@@ -1480,6 +1611,17 @@ class DartsApp:
                     surface_text,
                     bg_hex,
                     axis_limits,
+                )
+                c.create_image(left, board_y, anchor=tk.NW, image=self.stats_board_photos[side])
+            else:
+                self.stats_board_photos[side] = self.render_cricket_grouping_plot(
+                    board_size,
+                    [player["name"] for player in team_players],
+                    grouping_progression,
+                    bull_accuracy_progression,
+                    player_colors,
+                    surface_text,
+                    bg_hex,
                 )
                 c.create_image(left, board_y, anchor=tk.NW, image=self.stats_board_photos[side])
 
