@@ -24,6 +24,7 @@ from dart_engine.ui_common import (
     load_dart_history,
     load_saved_game,
     save_dart_history,
+    show_winner_animation,
     update_app_config,
 )
 
@@ -1036,7 +1037,11 @@ class DartsApp:
         if not self.game.winner or self.winner_dialog_shown:
             return
         self.winner_dialog_shown = True
-        should_save = messagebox.askyesno("Game Over", f"{self.game.winner} wins!\n\nDo you want to save this game?")
+        should_save = show_winner_animation(
+            self.root,
+            self.game.winner,
+            accent_color=self.player_color(self.game.active_player()),
+        )
         if should_save:
             self.save()
 
