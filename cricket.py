@@ -35,6 +35,7 @@ from dart_engine.ui_common import (
     load_saved_game,
     replay_dart_history,
     save_dart_history,
+    show_save_confirmation,
     show_winner_animation,
     update_app_config,
 )
@@ -398,6 +399,7 @@ class DartsApp:
             {
                 "player": player.name,
                 "team": self.active_side(),
+                "timestamp": datetime.now().astimezone().isoformat(timespec="seconds"),
                 "x": event.x,
                 "y": event.y,
                 "number": number,
@@ -1033,7 +1035,9 @@ class DartsApp:
         metadata = {"game_mode": self.mode_var.get()}
         if not self.is_solo_mode():
             metadata["team_names"] = [self.game.teams[0].name, self.game.teams[1].name]
-        save_dart_history(os.path.join(self.folder_path, filename), self.dart_history, metadata=metadata)
+        file_path = os.path.join(self.folder_path, filename)
+        save_dart_history(file_path, self.dart_history, metadata=metadata)
+        show_save_confirmation(self.root, file_path)
 
     def save_as(self):
         file_path = ask_history_save_path()
@@ -1042,6 +1046,7 @@ class DartsApp:
             if not self.is_solo_mode():
                 metadata["team_names"] = [self.game.teams[0].name, self.game.teams[1].name]
             save_dart_history(file_path, self.dart_history, metadata=metadata)
+            show_save_confirmation(self.root, file_path)
 
     def load(self):
         file_path = ask_history_load_path(self.folder_path)
@@ -1089,7 +1094,7 @@ class DartsApp:
         self.winner_dialog_shown = False
 
     def reset(self):
-        self.save_as()
+        self.save()
         self.dart_history = []
         self.game.reset()
         self.clear_all_darts()
