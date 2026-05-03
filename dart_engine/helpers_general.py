@@ -5,6 +5,18 @@ import tkinter as tk
 # Dartboard math
 # -------------------------
 
+OFFBOARD_RECT = (24, 524, 100, 562)
+BOUNCE_OUT_RECT = (499, 524, 575, 562)
+
+
+def classify_miss_zone(x, y):
+    in_offboard = OFFBOARD_RECT[0] <= x <= OFFBOARD_RECT[2] and OFFBOARD_RECT[1] <= y <= OFFBOARD_RECT[3]
+    in_bounce_out = BOUNCE_OUT_RECT[0] <= x <= BOUNCE_OUT_RECT[2] and BOUNCE_OUT_RECT[1] <= y <= BOUNCE_OUT_RECT[3]
+    return {
+        "offboard": in_offboard,
+        "bounce_out": in_bounce_out,
+    }
+
 def interpret_click(x, y):
 
     size_mm = 473.2
