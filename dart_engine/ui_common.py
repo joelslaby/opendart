@@ -78,6 +78,7 @@ def load_saved_game(file_path: str) -> dict:
     dart_history = payload["dart_history"]
 
     for hit in dart_history:
+        hit.setdefault("timestamp", None)
         if "offboard" not in hit or "bounce_out" not in hit:
             miss_zone = classify_miss_zone(hit.get("x", -1), hit.get("y", -1)) if hit.get("number") == 0 else {"offboard": False, "bounce_out": False}
             hit.setdefault("offboard", miss_zone["offboard"] or (hit.get("number") == 0 and not miss_zone["bounce_out"]))
@@ -287,3 +288,68 @@ def show_winner_animation(root: tk.Misc, winner_name: str, accent_color: str = "
     dialog.protocol("WM_DELETE_WINDOW", lambda: close(False))
     dialog.wait_window()
     return result["save"]
+
+
+def show_save_confirmation(root: tk.Misc, file_path: str) -> None:
+    dialog = tk.Toplevel(root)
+    dialog.title("Saved")
+    dialog.transient(root)
+    dialog.grab_set()
+    dialog.configure(bg="#171310")
+    dialog.resizable(False, False)
+
+    dialog_width = 430
+    dialog_height = 220
+    root_x = root.winfo_rootx()
+    root_y = root.winfo_rooty()
+    root_w = root.winfo_width() or root.winfo_screenwidth()
+    root_h = root.winfo_height() or root.winfo_screenheight()
+    dialog.geometry(
+        f"{dialog_width}x{dialog_height}+{root_x + (root_w - dialog_width) // 2}+{root_y + (root_h - dialog_height) // 2}"
+    )
+
+    body = tk.Frame(dialog, bg="#171310", padx=28, pady=24)
+    body.pack(fill=tk.BOTH, expand=True)
+    tk.Label(
+        body,
+        text="Game Saved",
+        font=("Avenir Next", 28, "bold"),
+        fg="#f7efe2",
+        bg="#171310",
+    ).pack()
+    tk.Label(
+        body,
+        text=os.path.basename(file_path),
+        font=("Avenir Next", 15, "bold"),
+        fg="#f08a2b",
+        bg="#171310",
+        wraplength=360,
+        justify=tk.CENTER,
+    ).pack(pady=(12, 6))
+    tk.Label(
+        body,
+        text="Your current game history was written successfully.",
+        font=("Avenir Next", 14),
+        fg="#c6b5a3",
+        bg="#171310",
+        wraplength=340,
+        justify=tk.CENTER,
+    ).pack()
+    tk.Button(
+        body,
+        text="Close",
+        font=("Avenir Next", 15, "bold"),
+        bg="#f08a2b",
+        fg="#171310",
+        activebackground="#f7efe2",
+        activeforeground="#171310",
+        bd=0,
+        highlightthickness=0,
+        padx=22,
+        pady=10,
+        cursor="hand2",
+        command=dialog.destroy,
+    ).pack(pady=(18, 0))
+
+    dialog.protocol("WM_DELETE_WINDOW", dialog.destroy)
+    dialog.wait_window()
