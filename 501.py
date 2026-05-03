@@ -358,13 +358,13 @@ class DartsApp:
         return self.mode_var.get() == "2v2"
 
     def is_solo_mode(self):
-        return self.mode_var.get() == "1v1"
+        return self.mode_var.get() == "2p"
 
     def is_individual_mode(self):
         return not self.is_team_mode()
 
     def individual_mode_player_count(self):
-        return {"1v1": 2, "3p": 3, "4p": 4}.get(self.mode_var.get(), 2)
+        return {"2p": 2, "3p": 3, "4p": 4}.get(self.mode_var.get(), 2)
 
     def player_slot_vars(self):
         return [
@@ -376,8 +376,8 @@ class DartsApp:
 
     def visible_player_slot_indices(self, mode=None):
         mode = self.mode_var.get() if mode is None else mode
-        if mode == "1v1":
-            return [0, 2]
+        if mode == "2p":
+            return [0, 1]
         if mode == "3p":
             return [0, 1, 2]
         return [0, 1, 2, 3]
@@ -387,11 +387,11 @@ class DartsApp:
         return [slot_vars[index].get() for index in self.visible_player_slot_indices(mode)]
 
     def apply_visible_names_to_mode(self, mode, names):
-        if mode == "1v1":
+        if mode == "2p":
             if names:
                 self.team1a_player_var.set(names[0])
             if len(names) > 1:
-                self.team2a_player_var.set(names[1])
+                self.team1b_player_var.set(names[1])
             return
         if mode == "3p":
             targets = [self.team1a_player_var, self.team1b_player_var, self.team2a_player_var]
@@ -482,9 +482,9 @@ class DartsApp:
             self.dropdown_2a.pack(side=tk.LEFT)
             self.dropdown_2b.pack(side=tk.LEFT)
             self.swap_team_2_button.pack(side=tk.LEFT)
-        elif self.mode_var.get() == "1v1":
+        elif self.mode_var.get() == "2p":
             self.dropdown_1a.pack(side=tk.LEFT)
-            self.dropdown_2a.pack(side=tk.LEFT)
+            self.dropdown_1b.pack(side=tk.LEFT)
         elif self.mode_var.get() == "3p":
             self.dropdown_1a.pack(side=tk.LEFT)
             self.dropdown_1b.pack(side=tk.LEFT)
@@ -503,9 +503,10 @@ class DartsApp:
         self.mode_var.set(mode)
         self._setting_mode = False
         self.game = Game501(mode)
+        self.mode = 4 if self.is_team_mode() else self.individual_mode_player_count()
 
         if preserve_names and existing_names:
-            if mode in {"1v1", "3p", "4p"}:
+            if mode in {"2p", "3p", "4p"}:
                 self.apply_visible_names_to_mode(mode, existing_visible_names or [])
             else:
                 self.apply_visible_names_to_mode(mode, existing_visible_names or [])
@@ -1104,8 +1105,8 @@ class DartsApp:
         unique_teams = sorted({hit.get("team", 0) for hit in self.dart_history})
         inferred_individual_mode = None
         if len(unique_teams) == len(turn_order):
-            inferred_individual_mode = {2: "1v1", 3: "3p", 4: "4p"}.get(len(unique_teams))
-        mode = metadata.get("game_mode") or inferred_individual_mode or ("1v1" if len(turn_order) <= 2 else "2v2")
+            inferred_individual_mode = {2: "2p", 3: "3p", 4: "4p"}.get(len(unique_teams))
+        mode = metadata.get("game_mode") or inferred_individual_mode or ("2p" if len(turn_order) <= 2 else "2v2")
         self.set_game_mode(mode, preserve_names=False)
 
         for player in turn_order:
@@ -1293,6 +1294,15 @@ class DartsApp:
         current_side = self.game.current_team
 
         c.create_rectangle(
+            0,
+            0,
+            size_x,
+            60,
+            fill="white",
+            outline="white",
+        )
+
+        c.create_rectangle(
             col_width * current_side + col_width / 2 - highlight_width / 2,
             60,
             col_width * current_side + col_width / 2 + highlight_width / 2,
@@ -1321,6 +1331,43 @@ class DartsApp:
             self.draw_infoboard_teams()
         else:
             self.draw_infoboard_individual()
+
+    def draw_turn_score_cells(self, canvas, left, top, width, box_height, hits, score_sum):
+        canvas.create_line(left, top, left + width, top, fill="black", width=2)
+        step = width / 4
+        for split_index in range(1, 4):
+            split_x = left + step * split_index
+            canvas.create_line(split_x, top + box_height, split_x, top, fill="black", width=2)
+
+        for idx, hit in enumerate(hits[:3]):
+            canvas.create_text(left + step * (idx + 0.5), top + box_height / 2, text=hit, font=("Arial", 20), fill="black")
+        canvas.create_text(left + step * 3.5, top + box_height / 2, text=f"{score_sum}", font=("Arial", 20, "bold"), fill="black")
+
+    def draw_player_turn_card(self, canvas, player, image_center, label_y, image_y, pfp_size, cell_left, cell_top, cell_width, box_height, hits, score_sum, image_attr):
+        canvas.create_text(image_center, label_y, text=player.name, font=("Arial", 20, "bold"), fill=self.player_color(player))
+        image = self.load_player_image(player, pfp_size)
+        setattr(self.root, image_attr, image)
+        canvas.create_image(image_center, image_y, image=image)
+        self.draw_turn_score_cells(canvas, cell_left, cell_top, cell_width, box_height, hits, score_sum)
+
+    def individual_bottom_card_layouts(self, width, panel_width, panel_height):
+        if self.mode == 2:
+            return [(
+                width / 2 + panel_width,
+                12 + panel_height,
+                72 + panel_height,
+                width / 2 + panel_width / 2,
+            )]
+        if self.mode == 3:
+            return [
+                (width / 2, 12 + panel_height, 72 + panel_height, width / 2 - panel_width / 2),
+                (width / 2 + panel_width, 12 + panel_height, 72 + panel_height, width / 2 + panel_width / 2),
+            ]
+        return [
+            (width / 2 - panel_width, 12 + panel_height, 72 + panel_height, width / 2 - panel_width * 3 / 2),
+            (width / 2, 12 + panel_height, 72 + panel_height, width / 2 - panel_width / 2),
+            (width / 2 + panel_width, 12 + panel_height, 72 + panel_height, width / 2 + panel_width / 2),
+        ]
 
     def infoboard_layout(self):
         width = 600
@@ -1413,7 +1460,7 @@ class DartsApp:
         c.create_text(width / 2 + panel_width * 11 / 8, panel_height - box_height / 2, text=f"{p0_hit_sum}", font=("Arial", 20, "bold"), fill="black")
         x_shift = panel_width / 4
         for idx, hit in enumerate(p0_hits[:3]):
-            c.create_text(width / 2 + panel_width * 7 / 8 + x_shift * idx, panel_height - box_height / 2, text=hit, font=("Arial", 20), fill="black")
+            c.create_text(width / 2 + panel_width * 5 / 8 + x_shift * idx, panel_height - box_height / 2, text=hit, font=("Arial", 20), fill="black")
 
         bottom_rows = [(p1_hits, p1_hit_sum), (p2_hits, p2_hit_sum), (p3_hits, p3_hit_sum)]
         x_pos = width / 2 - panel_width * 3 / 2 - panel_width / 8
@@ -1429,31 +1476,23 @@ class DartsApp:
         c.delete("all")
         width, panel_width, panel_height, pfp_size, box_height = self.infoboard_layout()
 
+        # Creates the main borders
         c.create_line(int(width / 2 - panel_width / 2), panel_height, int(width / 2 - panel_width / 2), panel_height * 2, fill="black", width=3)
         c.create_line(int(width / 2 + panel_width / 2), 0, int(width / 2 + panel_width / 2), panel_height * 2, fill="black", width=3)
         c.create_line(0, panel_height, width, panel_height, fill="black", width=3)
 
-        y_pos = panel_height * 2 - box_height
-        x_pos = width / 2 + panel_width / 2
-        c.create_line(x_pos, panel_height - box_height, x_pos + panel_width, panel_height - box_height, fill="black", width=2)
-        c.create_line(x_pos, y_pos, x_pos + panel_width, y_pos, fill="black", width=2)
-        x_shift = panel_width / 4
-        for _ in range(3):
-            c.create_line(x_pos + x_shift, panel_height, x_pos + x_shift, panel_height - box_height, fill="black", width=2)
-            c.create_line(x_pos + x_shift, y_pos + box_height, x_pos + x_shift, y_pos, fill="black", width=2)
-            x_shift += panel_width / 4
-
-        player_list = self.game.rotated_turn_order()
         turn_summary = self.infoboard_turn_summary
         current_name = turn_summary["focus_player"]
+        focus_player_list = self.game.rotated_turn_order(start_player=current_name)
+        side_player_list = [
+            player
+            for player in self.game.rotated_turn_order(start_player=self.game.active_player())
+            if player.name != current_name
+        ]
         p0_current_hits = turn_summary["players"][current_name]["current_hits"]
-        current_summary = turn_summary["players"][current_name]
-        p0_hits = current_summary["previous_hits"]
-        current_score_history = self.get_player_score_history(player_list[0])
-        p0_hit_sum = current_score_history[-2] if len(current_score_history) > 1 else 0
-
+        # Creates current player (focus) boxes + name
         c.create_text(10, 20, anchor="w", text=current_name, font=("Arial", 30, "bold"), fill=self.player_color(current_name))
-        c.create_text(panel_width * 2 - 10, 20, anchor="e", text=str(self.game.score_for_player(player_list[0])), font=("Arial", 30, "bold"), fill=self.player_color(current_name))
+        c.create_text(panel_width * 2 - 10, 20, anchor="e", text=str(self.game.score_for_player(focus_player_list[0])), font=("Arial", 30, "bold"), fill=self.player_color(current_name))
         c.create_line(panel_width * 1 / 4, 40, panel_width * 7 / 4, 40, fill="black", width=2)
         c.create_line(panel_width * 1 / 4, 120, panel_width * 7 / 4, 120, fill="black", width=2)
         for x in [panel_width * 1 / 4, panel_width * 3 / 4, panel_width * 5 / 4, panel_width * 7 / 4]:
@@ -1471,88 +1510,58 @@ class DartsApp:
 
         if turn_summary["next_player_flag"]:
             next_player = self.game.active_player()
-            c.create_text(10, 140, anchor="w", text="Next player:", font=("Arial", 30, "bold"), fill="black")
             c.create_text(10, 140, anchor="w", text=f"Next player: {next_player.name}", font=("Arial", 30, "bold"), fill=self.player_color(next_player))
+            c.create_text(10, 140, anchor="w", text="Next player:", font=("Arial", 30, "bold"), fill="black")
 
-        # Top-right previous-turn card for the current player.
-        y_pos = panel_height - box_height
-        x_pos = width / 2 + panel_width / 2
-        c.create_line(x_pos, y_pos, x_pos + panel_width, y_pos, fill="black", width=2)
-        x_shift = panel_width / 4
-        for _ in range(3):
-            c.create_line(x_pos + x_shift, y_pos + box_height, x_pos + x_shift, y_pos, fill="black", width=2)
-            x_shift += panel_width / 4
-
-        top_right_position = (width / 2 + panel_width, 12, 72)
-        current_card_player = player_list[0]
-        x_text, y_text, y_img = top_right_position
-        c.create_text(x_text, y_text, text=current_card_player.name, font=("Arial", 20, "bold"), fill=self.player_color(current_card_player))
-        current_image = self.load_player_image(current_card_player, pfp_size)
-        self.root.individual_focus_image = current_image
-        c.create_image(x_text, y_img, image=current_image)
-
-        remaining_players = player_list[1:]
-        if len(remaining_players) == 1:
-            positions = [(width / 2 + panel_width, 12 + panel_height, 72 + panel_height)]
-        elif len(remaining_players) == 2:
-            positions = [
-                (width / 2, 12 + panel_height, 72 + panel_height),
-                (width / 2 + panel_width, 12 + panel_height, 72 + panel_height),
-            ]
+        current_summary = turn_summary["players"][current_name]
+        current_score_history = self.get_player_score_history(focus_player_list[0])
+        if turn_summary["next_player_flag"]:
+            p0_hits = current_summary["current_hits"]
+            p0_hit_sum = current_score_history[-1] if current_score_history else 0
         else:
-            positions = [
-                (width / 2 - panel_width, 12 + panel_height, 72 + panel_height),
-                (width / 2, 12 + panel_height, 72 + panel_height),
-                (width / 2 + panel_width, 12 + panel_height, 72 + panel_height),
-            ]
+            p0_hits = current_summary["previous_hits"]
+            p0_hit_sum = current_score_history[-2] if len(current_score_history) > 1 else 0
 
-        # Bottom-row previous-turn cards for the remaining players.
-        bottom_y = panel_height * 2 - box_height
-        bottom_box_lefts = [
-            width / 2 - panel_width * 3 / 2,
-            width / 2 - panel_width / 2,
+        current_card_player = focus_player_list[0]
+        self.draw_player_turn_card(
+            c,
+            current_card_player,
+            width / 2 + panel_width,
+            12,
+            72,
+            pfp_size,
             width / 2 + panel_width / 2,
-        ]
-        for left in bottom_box_lefts:
-            c.create_line(left, bottom_y, left + panel_width, bottom_y, fill="black", width=2)
-            split_x = panel_width / 4
-            for _ in range(3):
-                c.create_line(left + split_x, bottom_y + box_height, left + split_x, bottom_y, fill="black", width=2)
-                split_x += panel_width / 4
+            panel_height - box_height,
+            panel_width,
+            box_height,
+            p0_hits,
+            p0_hit_sum,
+            "individual_focus_image",
+        )
 
-        for index, player in enumerate(remaining_players):
-            x_text, y_text, y_img = positions[index]
-            c.create_text(x_text, y_text, text=player.name, font=("Arial", 20, "bold"), fill=self.player_color(player))
-            image = self.load_player_image(player, pfp_size)
-            setattr(self.root, f"individual_image_{index}", image)
-            c.create_image(x_text, y_img, image=image)
-
-        x_start = width / 2 + panel_width / 2 - panel_width / 8
-        for idx, hit in enumerate(p0_hits[:3]):
-            c.create_text(x_start + panel_width / 4 * (idx + 1), panel_height - box_height / 2, text=hit, font=("Arial", 20), fill="black")
-        c.create_text(x_start + panel_width, panel_height - box_height / 2, text=f"{p0_hit_sum}", font=("Arial", 20, "bold"), fill="black")
-
-        if len(remaining_players) == 1:
-            x_positions = [width / 2 + panel_width / 2 - panel_width / 8]
-        elif len(remaining_players) == 2:
-            x_positions = [
-                width / 2 - panel_width / 8,
-                width / 2 + panel_width - panel_width / 8,
-            ]
-        else:
-            x_positions = [
-                width / 2 - panel_width * 3 / 2 - panel_width / 8,
-                width / 2 - panel_width / 2 - panel_width / 8,
-                width / 2 + panel_width / 2 - panel_width / 8,
-            ]
-        for x_pos, player in zip(x_positions, remaining_players):
+        remaining_players = side_player_list
+        layouts = self.individual_bottom_card_layouts(width, panel_width, panel_height)
+        for index, (player, layout) in enumerate(zip(remaining_players, layouts)):
             player_name = player.name if hasattr(player, "name") else player
             hits = turn_summary["players"][player_name]["previous_hits"]
             score_history = self.get_player_score_history(player)
             score_sum = score_history[-1] if score_history else 0
-            for idx, hit in enumerate(hits[:3]):
-                c.create_text(x_pos + panel_width / 4 * (idx + 1), bottom_y + box_height / 2, text=hit, font=("Arial", 20), fill="black")
-            c.create_text(x_pos + panel_width, bottom_y + box_height / 2, text=f"{score_sum}", font=("Arial", 20, "bold"), fill="black")
+            image_center, label_y, image_y, cell_left = layout
+            self.draw_player_turn_card(
+                c,
+                player,
+                image_center,
+                label_y,
+                image_y,
+                pfp_size,
+                cell_left,
+                panel_height * 2 - box_height,
+                panel_width,
+                box_height,
+                hits,
+                score_sum,
+                f"individual_image_{index}",
+            )
     
     def draw_recboard(self):
         c = self.rec_canvas
