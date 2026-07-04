@@ -4,7 +4,15 @@
 # binary gets silently denied by macOS's per-app Documents-folder sandbox
 # (TCC), but Terminal already has that access, so we ride on it instead.
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-PYTHON="/Users/jhiesener/miniconda3/envs/darts/bin/python"
+
+if [ -x "/Users/jhiesener/miniconda3/envs/darts/bin/python" ]; then
+    PYTHON="/Users/jhiesener/miniconda3/envs/darts/bin/python"
+elif [ -x "$DIR/venv/bin/python3" ]; then
+    PYTHON="$DIR/venv/bin/python3"
+else
+    PYTHON="$(command -v python3)"
+fi
+
 CMD="cd $DIR && $PYTHON darts.py; exit"
 
 osascript -e "tell application \"Terminal\" to do script \"$CMD\"" >/dev/null 2>&1
