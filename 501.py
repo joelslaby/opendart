@@ -69,6 +69,14 @@ class DartsApp:
         root.attributes('-fullscreen', True)
         x = root.winfo_width()
         y = root.winfo_height()
+        self.window_height = y
+
+        # Controls below the board are stacked in 6 rows; space them to fill
+        # whatever vertical room this screen actually has instead of assuming
+        # one fixed resolution (MacBook Air vs. MacBook Pro differ by ~30px).
+        content_top = 700
+        row_step = max(30, (y - content_top - 55) / 5)
+        self.row_y = [content_top + i * row_step for i in range(6)]
 
         self.game = Game501(starting_score=starting_score, in_rule=in_rule, out_rule=out_rule)
 
@@ -140,7 +148,7 @@ class DartsApp:
         self.stats_view_var.trace_add("write", self.handle_stats_view_change)
 
         btn_frame1 = tk.Frame(root)
-        btn_frame1.place(x=5, y=700)
+        btn_frame1.place(x=5, y=self.row_y[0])
 
         if self.on_back:
             tk.Button(btn_frame1,text="Menu",font=("Arial",24),command=self.on_back, padx=0).pack(side=tk.LEFT)
@@ -149,13 +157,13 @@ class DartsApp:
         tk.Button(btn_frame1,text="New Game",font=("Arial",24),command=self.reset, padx=0).pack(side=tk.LEFT)
 
         btn_frame2 = tk.Frame(root)
-        btn_frame2.place(x=5, y=740)
+        btn_frame2.place(x=5, y=self.row_y[1])
         tk.Button(btn_frame2,text="Save",font=("Arial",24),command=self.save).pack(side=tk.LEFT)
         tk.Button(btn_frame2,text="Save Setup...",font=("Arial",24),command=self.save_setup).pack(side=tk.LEFT)
         tk.Button(btn_frame2,text="Save As...",font=("Arial",24),command=self.save_as).pack(side=tk.RIGHT)
 
         btn_frame3 = tk.Frame(root)
-        btn_frame3.place(x=50, y=785)
+        btn_frame3.place(x=50, y=self.row_y[2])
         tk.Entry(
             btn_frame3,
             textvariable=self.folder_path_var,
@@ -171,7 +179,7 @@ class DartsApp:
         self.team2_name_var = tk.StringVar(value=self.game.teams[1].name)
 
         btn_frame4 = tk.Frame(root)
-        btn_frame4.place(x=0, y=815)
+        btn_frame4.place(x=0, y=self.row_y[3])
 
         self.team1_name_button = tk.Button(
             btn_frame4,
@@ -205,7 +213,7 @@ class DartsApp:
         self.swap_team_1_button.pack(side=tk.LEFT)
 
         btn_frame5 = tk.Frame(root)
-        btn_frame5.place(x=0, y=850)
+        btn_frame5.place(x=0, y=self.row_y[4])
         self.team2_name_button = tk.Button(
             btn_frame5,
             textvariable=self.team2_name_var,
@@ -238,7 +246,7 @@ class DartsApp:
         self.swap_team_2_button.pack(side=tk.LEFT)
 
         btn_frame6 = tk.Frame(root)
-        btn_frame6.place(x=0, y=890)
+        btn_frame6.place(x=0, y=self.row_y[5])
         tk.Button(btn_frame6,text="Swap teams",font=("Arial",20),command=self.swap_teams).pack(side=tk.LEFT)
         tk.Button(btn_frame6,text="Add Player",font=("Arial",20),command=self.add_player).pack(side=tk.LEFT)
         self.mode_var = tk.StringVar(value="2v2")
@@ -520,12 +528,22 @@ class DartsApp:
                     self.team1_name_var.set(existing_team_names[0])
                     self.team2_name_var.set(existing_team_names[1])
             self.apply_player_vars_to_game()
+        else:
+            self.seed_default_players()
 
         self.sync_player_vars_from_game()
         self.update_mode_controls()
         self.clear_all_darts()
         self.refresh_caches()
         self.update_label()
+
+    def seed_default_players(self):
+        names = self.player_options
+        if not names:
+            return
+        for index, var in enumerate(self.player_slot_vars()):
+            var.set(names[index % len(names)])
+        self.apply_player_vars_to_game()
 
     def handle_mode_change(self, *_):
         if self.game is None or getattr(self, "_setting_mode", False):
@@ -1241,7 +1259,7 @@ class DartsApp:
         c = self.score_canvas
         c.delete("all")
 
-        size_x = 454
+        size_x = max(int(c.winfo_width()), int(float(c["width"])))
         size_y = 600
         row_height = 68
         start_y = 90
@@ -1287,7 +1305,7 @@ class DartsApp:
         c = self.score_canvas
         c.delete("all")
 
-        size_x = 454
+        size_x = max(int(c.winfo_width()), int(float(c["width"])))
         size_y = 600
         row_height = 68
         start_y = 90
@@ -1377,12 +1395,11 @@ class DartsApp:
     def infoboard_layout(self):
         width = 600
         panel_width = int(width / 3)
-        if self.screen_width == 1470:
-            panel_height = 162
-            pfp_size = 98
-        else:
-            panel_height = 174
-            pfp_size = 100
+        # info_canvas is 2 stacked panels tall; size them to whatever room
+        # this screen's height actually leaves below the board (was
+        # hardcoded for one exact MacBook Air width before).
+        panel_height = max(140, int((self.window_height - 604) / 2))
+        pfp_size = max(80, int(panel_height * 100 / 174))
         return width, panel_width, panel_height, pfp_size, 40
 
     def draw_infoboard_teams(self):
@@ -1572,7 +1589,7 @@ class DartsApp:
         c = self.rec_canvas
         c.delete("all")
 
-        size_x = 454
+        size_x = max(int(c.winfo_width()), int(float(c["width"])))
         size_y = 98
         rec_size_x = 100
         rec_size_y = 60

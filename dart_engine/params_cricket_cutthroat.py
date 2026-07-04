@@ -35,7 +35,7 @@ class Player:
         self.cricket_tallies = {num: 0 for num in CRICKET_NUMBERS}
         self.cricket_closed = {num: False for num in CRICKET_NUMBERS}
         self.score = 0
-        self.hits_against = 0
+        self.hits_against = {num: 0 for num in CRICKET_NUMBERS}
 
 
 class CricketGame:
@@ -119,7 +119,7 @@ class CricketGame:
             for opponent in self.opponents(player):
                 if not opponent.cricket_closed[hit.zone]:
                     opponent.score += hits_over * hit.zone
-                    opponent.hits_against += 1
+                    opponent.hits_against[hit.zone] += hits_over
 
         self.check_winner()
         if self.winner:
