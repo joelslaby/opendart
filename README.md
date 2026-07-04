@@ -188,3 +188,10 @@ python darts.py
 ## Additional Documentation
 
 For a short codebase/architecture map, see [docs/architecture.md](docs/architecture.md).
+
+### Application install
+
+1. Copy the whole project folder there (git clone, AirDrop, USB — whatever).
+2. Install Python 3 if not present (from python.org, or brew install python).
+3. cd into the folder, run: pip3 install -r requirements.txt (installs Pillow, matplotlib, pandas — tkinter ships with Python itself).
+4. Double-click OpenDart.app (or OpenDart.command).
