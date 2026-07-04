@@ -377,7 +377,9 @@ class DartsApp:
             self.dropdown_2a.pack_forget()
             self.dropdown_2a.pack(side=tk.LEFT)
 
-            self.team3_frame.place(x=360, y=self.row_y[4])
+            self.team2_frame.update_idletasks()
+            team3_x = self.team2_frame.winfo_x() + self.team2_frame.winfo_reqwidth() + 8
+            self.team3_frame.place(x=team3_x, y=self.row_y[4])
         elif self.is_solo_mode():
             self.team1_name_button.pack_forget()
             self.team2_name_button.pack_forget()
@@ -1728,7 +1730,7 @@ class DartsApp:
 
         zoom_factor = 3
         line_size = 50
-        canvas_size = 460
+        canvas_size = max(int(c.winfo_width()), int(float(c["width"])))
         img = self.zoom_source_img.copy()
         img = img.crop((int(x - 300 / zoom_factor), int(y - 300 / zoom_factor), int(x + 300 / zoom_factor), int(y + 300 / zoom_factor)))
         img = img.resize((canvas_size, canvas_size), Image.Resampling.LANCZOS)
@@ -1799,6 +1801,11 @@ class DartsApp:
         gutter = 8
         n_cols = max(1, len(teams))
         col_width = max(1, (width - outer_pad * 2 - gutter * (n_cols - 1)) / n_cols)
+        # Inline stat rows ("DCT 2  M 2  MPR 3.00  HIT 0%") are sized for a
+        # ~210px-wide card; narrower cards (more players/columns, smaller
+        # screens) shrink the stat font so the row keeps fitting instead of
+        # overflowing off the card.
+        stat_scale = max(0.6, min(1.0, col_width / 210))
         col_lefts = [outer_pad + i * (col_width + gutter) for i in range(n_cols)]
         title_y = 10
 
@@ -1839,9 +1846,10 @@ class DartsApp:
                         ("D", team["doubles"]),
                         ("T", team["triples"]),
                     ],
-                    ("Arial", 10, "bold"),
-                    ("Arial", 10),
+                    ("Arial", max(7, round(10 * stat_scale)), "bold"),
+                    ("Arial", max(7, round(10 * stat_scale))),
                     color=team_text,
+                    gap=round(10 * stat_scale),
                 )
                 y = top_y + team_box_height + 3
 
@@ -1870,9 +1878,10 @@ class DartsApp:
                         ("MPR", f"{player['mpr']:.2f}"),
                         ("HIT", f"{player['hit_rate']:.0f}%"),
                     ],
-                    ("Arial", 9, "bold"),
-                    ("Arial", 9),
+                    ("Arial", max(7, round(9 * stat_scale)), "bold"),
+                    ("Arial", max(7, round(9 * stat_scale))),
                     color=player_text,
+                    gap=round(10 * stat_scale),
                 )
                 self.draw_inline_stats(
                     c,
@@ -1885,9 +1894,10 @@ class DartsApp:
                         ("PTS", player["points"]),
                         ("AGI", f"{player['previous_grouping']:.1f}"),
                     ],
-                    ("Arial", 9, "bold"),
-                    ("Arial", 9),
+                    ("Arial", max(7, round(9 * stat_scale)), "bold"),
+                    ("Arial", max(7, round(9 * stat_scale))),
                     color=player_text,
+                    gap=round(10 * stat_scale),
                 )
                 y += player_box_height + player_gap
 

@@ -4,8 +4,10 @@
 # macOS's per-app TCC sandboxing and gets denied reading this folder.
 cd "$(dirname "${BASH_SOURCE[0]}")" || exit 1
 
-if [ -x "/Users/jhiesener/miniconda3/envs/darts/bin/python" ]; then
-    PYTHON="/Users/jhiesener/miniconda3/envs/darts/bin/python"
+if [ -x "$HOME/miniconda3/envs/darts/bin/python" ]; then
+    PYTHON="$HOME/miniconda3/envs/darts/bin/python"
+elif [ -x "/opt/miniconda3/envs/darts/bin/python" ]; then
+    PYTHON="/opt/miniconda3/envs/darts/bin/python"
 elif [ -x "venv/bin/python3" ]; then
     PYTHON="venv/bin/python3"
 else

@@ -5,8 +5,10 @@
 # (TCC), but Terminal already has that access, so we ride on it instead.
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
-if [ -x "/Users/jhiesener/miniconda3/envs/darts/bin/python" ]; then
-    PYTHON="/Users/jhiesener/miniconda3/envs/darts/bin/python"
+if [ -x "$HOME/miniconda3/envs/darts/bin/python" ]; then
+    PYTHON="$HOME/miniconda3/envs/darts/bin/python"
+elif [ -x "/opt/miniconda3/envs/darts/bin/python" ]; then
+    PYTHON="/opt/miniconda3/envs/darts/bin/python"
 elif [ -x "$DIR/venv/bin/python3" ]; then
     PYTHON="$DIR/venv/bin/python3"
 else

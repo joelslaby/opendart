@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 
 CRICKET_NUMBERS = [20, 19, 18, 17, 16, 15, 25]
