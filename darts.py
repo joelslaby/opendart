@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import tkinter as tk
+from tkinter import ttk
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -43,6 +44,11 @@ class DartsLauncher:
         self.clear_root()
         self.current_app = None
         self.root.title("Darts")
+        self.x01_score_var = tk.StringVar(value="501")
+        self.x01_in_var = tk.StringVar(value="Any")
+        self.x01_out_var = tk.StringVar(value="Double")
+        self.x01_mode_var = tk.StringVar(value="2v2 Teams")
+        self.cricket_mode_var = tk.StringVar(value="2v2 Teams")
         screen_w = self.root.winfo_screenwidth()
         screen_h = self.root.winfo_screenheight()
 
@@ -79,16 +85,19 @@ class DartsLauncher:
             cta="Play Cricket",
             command=lambda: self.launch_game("cricket"),
             side="left",
+            options_builder=self.build_cricket_options,
+            card_height=430,
         )
         self.build_menu_card(
             parent=card_row,
-            title="501",
-            subtitle="Chase the finish. Find the double.",
-            description="Classic score-down play, individual or team formats, and full match tracking.",
+            title="X01",
+            subtitle="Chase the finish. Pick your rules.",
+            description="Classic score-down play with a configurable starting score and in/out rules, individual or team formats, full match tracking.",
             accent=ACCENT_ORANGE,
-            cta="Play 501",
-            command=lambda: self.launch_game("501"),
+            cta="Play X01",
+            command=lambda: self.launch_game("x01"),
             side="right",
+            options_builder=self.build_x01_options,
         )
 
         footer = tk.Frame(self.root, bg=MENU_BG)
@@ -145,8 +154,9 @@ class DartsLauncher:
             width=2,
         )
 
-    def build_menu_card(self, parent, title, subtitle, description, accent, cta, command, side):
-        card = tk.Frame(parent, bg=MENU_PANEL if side == "left" else MENU_PANEL_ALT, width=390, height=350)
+    def build_menu_card(self, parent, title, subtitle, description, accent, cta, command, side, options_builder=None, card_height=None):
+        height = card_height if card_height else (480 if options_builder else 350)
+        card = tk.Frame(parent, bg=MENU_PANEL if side == "left" else MENU_PANEL_ALT, width=390, height=height)
         card.pack_propagate(False)
         card.pack(side=tk.LEFT, padx=20)
 
@@ -183,6 +193,9 @@ class DartsLauncher:
             anchor="center",
         ).pack(anchor="center")
 
+        if options_builder:
+            options_builder(body)
+
         stat_row = tk.Frame(body, bg=body.cget("bg"))
         stat_row.pack(anchor="center", pady=(28, 22))
         for text in ("Live Stats", "Profiles", "History"):
@@ -213,16 +226,104 @@ class DartsLauncher:
             cursor="hand2",
         ).pack(anchor="center")
 
+    X01_MODE_DISPLAY_TO_KEY = {
+        "2v2 Teams": "2v2",
+        "1v1": "2p",
+        "3 Player": "3p",
+        "4 Player": "4p",
+    }
+
+    CRICKET_MODE_DISPLAY_TO_KEY = {
+        "2v2 Teams": "2v2",
+        "1v1": "1v1",
+        "Cutthroat (3p)": "cutthroat",
+    }
+
+    def build_cricket_options(self, parent):
+        mode_row = tk.Frame(parent, bg=parent.cget("bg"))
+        mode_row.pack(anchor="center", pady=(0, 18))
+        column = tk.Frame(mode_row, bg=parent.cget("bg"))
+        column.pack(side=tk.LEFT, padx=8)
+        tk.Label(
+            column,
+            text="Mode",
+            font=("Avenir Next", 11, "bold"),
+            fg=MENU_MUTED,
+            bg=parent.cget("bg"),
+        ).pack()
+        ttk.Combobox(
+            column,
+            textvariable=self.cricket_mode_var,
+            values=list(self.CRICKET_MODE_DISPLAY_TO_KEY.keys()),
+            font=("Avenir Next", 13),
+            state="readonly",
+            width=13,
+        ).pack()
+
+    def build_x01_options(self, parent):
+        players_row = tk.Frame(parent, bg=parent.cget("bg"))
+        players_row.pack(anchor="center", pady=(0, 10))
+        column = tk.Frame(players_row, bg=parent.cget("bg"))
+        column.pack(side=tk.LEFT, padx=8)
+        tk.Label(
+            column,
+            text="Players",
+            font=("Avenir Next", 11, "bold"),
+            fg=MENU_MUTED,
+            bg=parent.cget("bg"),
+        ).pack()
+        ttk.Combobox(
+            column,
+            textvariable=self.x01_mode_var,
+            values=list(self.X01_MODE_DISPLAY_TO_KEY.keys()),
+            font=("Avenir Next", 13),
+            state="readonly",
+            width=10,
+        ).pack()
+
+        options_row = tk.Frame(parent, bg=parent.cget("bg"))
+        options_row.pack(anchor="center", pady=(0, 18))
+
+        for label, var, values in (
+            ("Score", self.x01_score_var, ["101", "301", "501", "701", "901"]),
+            ("In", self.x01_in_var, ["Any", "Single", "Double", "Triple"]),
+            ("Out", self.x01_out_var, ["Any", "Single", "Double", "Triple"]),
+        ):
+            column = tk.Frame(options_row, bg=parent.cget("bg"))
+            column.pack(side=tk.LEFT, padx=8)
+            tk.Label(
+                column,
+                text=label,
+                font=("Avenir Next", 11, "bold"),
+                fg=MENU_MUTED,
+                bg=parent.cget("bg"),
+            ).pack()
+            ttk.Combobox(
+                column,
+                textvariable=var,
+                values=values,
+                font=("Avenir Next", 13),
+                state="readonly",
+                width=7,
+            ).pack()
+
     def launch_game(self, game_key):
         self.clear_root()
-        if game_key == "501":
-            self.current_app = five01_module.DartsApp(self.root, on_back=self.show_menu, initial_mode="2v2")
-        elif game_key == "501_solo":
-            self.current_app = five01_module.DartsApp(self.root, on_back=self.show_menu, initial_mode="1v1")
+        if game_key == "x01":
+            self.current_app = five01_module.DartsApp(
+                self.root,
+                on_back=self.show_menu,
+                initial_mode=self.X01_MODE_DISPLAY_TO_KEY[self.x01_mode_var.get()],
+                starting_score=int(self.x01_score_var.get()),
+                in_rule=self.x01_in_var.get().lower(),
+                out_rule=self.x01_out_var.get().lower(),
+            )
         elif game_key == "cricket":
-            self.current_app = cricket_module.DartsApp(self.root, on_back=self.show_menu, initial_mode="2v2")
-        elif game_key == "cricket_solo":
-            self.current_app = cricket_module.DartsApp(self.root, on_back=self.show_menu, initial_mode="1v1")
+            self.current_app = cricket_module.DartsApp(
+                self.root,
+                on_back=self.show_menu,
+                initial_mode=self.CRICKET_MODE_DISPLAY_TO_KEY[self.cricket_mode_var.get()],
+            )
         else:
             raise ValueError(f"Unknown game: {game_key}")
 

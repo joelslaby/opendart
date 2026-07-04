@@ -80,10 +80,8 @@ def build_all_cricket_marks_by_turn(
     carry_running_total: bool = False,
     complete_turns_only: bool = False,
 ) -> dict[str, list[int]]:
-    remaining = {
-        0: {number: 3 for number in CRICKET_NUMBERS},
-        1: {number: 3 for number in CRICKET_NUMBERS},
-    }
+    sides = sorted(set(side_lookup.values())) or [0]
+    remaining = {side: {number: 3 for number in CRICKET_NUMBERS} for side in sides}
 
     if complete_turns_only:
         history = history[: len(history) - (len(history) % 3)]
@@ -107,7 +105,6 @@ def build_all_cricket_marks_by_turn(
         number = hit["number"]
         if number in CRICKET_NUMBERS:
             side = side_lookup[hit_player]
-            opponent = 1 - side
             hits_remaining = remaining[side][number]
 
             if hits_remaining > 0:
@@ -116,10 +113,11 @@ def build_all_cricket_marks_by_turn(
                 if marks[hit_player]:
                     current_turn_marks[hit_player] += applied_hits
 
+            other_open = any(remaining[other][number] > 0 for other in sides if other != side)
             if (
                 marks[hit_player]
                 and remaining[side][number] == 0
-                and remaining[opponent][number] > 0
+                and other_open
             ):
                 overflow_hits = max(0, hit["multiplier"] - hits_remaining)
                 current_turn_marks[hit_player] += overflow_hits

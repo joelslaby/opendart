@@ -1,6 +1,15 @@
 from dataclasses import dataclass
 
 
+RULE_MULTIPLIER = {"single": 1, "double": 2, "triple": 3}
+
+
+def _rule_satisfied(hit, rule):
+    if rule == "any":
+        return True
+    return hit.multiplier == RULE_MULTIPLIER[rule]
+
+
 @dataclass
 class Hit:
     zone: int
@@ -25,6 +34,7 @@ class Team:
         self.name = name
         self.players = [Player(player_name) for player_name in player_names]
         self.score = 501
+        self.opened = True
 
     def get_player_by_name(self, name):
         return next((player for player in self.players if player.name == name), None)
@@ -37,8 +47,11 @@ class Team:
 
 
 class Game501:
-    def __init__(self, mode="2v2"):
+    def __init__(self, mode="2v2", starting_score=501, in_rule="any", out_rule="double"):
         self.mode = mode
+        self.starting_score = starting_score
+        self.in_rule = in_rule
+        self.out_rule = out_rule
         if mode == "1v1":
             self.teams = [Team("Jacob", "Jacob"), Team("Dustin", "Dustin")]
         elif mode == "3p":
@@ -137,17 +150,24 @@ class Game501:
         team = self.teams[self.current_team]
 
         team.add_hit(player, hit)
-        team.score -= hit.multiplier * hit.zone
         self.darts_in_turn += 1
 
-        if team.score == 0 and hit.multiplier == 2:
-            self.winner = team.name
-            return
+        if not team.opened:
+            if _rule_satisfied(hit, self.in_rule):
+                team.opened = True
+                team.score -= hit.multiplier * hit.zone
+        else:
+            team.score -= hit.multiplier * hit.zone
 
-        if team.score <= 1:
-            team.score = self.turn_start_score
-            self.next_turn()
-            return
+        if team.opened:
+            if team.score == 0 and _rule_satisfied(hit, self.out_rule):
+                self.winner = team.name
+                return
+
+            if team.score <= 1:
+                team.score = self.turn_start_score
+                self.next_turn()
+                return
 
         if self.darts_in_turn == 3:
             self.next_turn()
@@ -160,6 +180,7 @@ class Game501:
         self.winner = None
 
         for team in self.teams:
-            team.score = 501
+            team.score = self.starting_score
+            team.opened = (self.in_rule == "any")
 
         self.turn_start_score = self.teams[self.current_team].score

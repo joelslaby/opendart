@@ -58,16 +58,19 @@ TEXT_LIGHT = "#f5f1ea"
 
 class DartsApp:
 
-    def __init__(self, root, on_back=None, initial_mode="2v2"):
+    def __init__(self, root, on_back=None, initial_mode="2v2", starting_score=501, in_rule="any", out_rule="double"):
 
         self.root = root
         self.on_back = on_back
-        root.title("501 Darts")
+        self.starting_score = starting_score
+        self.in_rule = in_rule
+        self.out_rule = out_rule
+        root.title(f"{starting_score} Darts — {in_rule.title()} In / {out_rule.title()} Out")
         root.attributes('-fullscreen', True)
         x = root.winfo_width()
         y = root.winfo_height()
 
-        self.game = Game501()
+        self.game = Game501(starting_score=starting_score, in_rule=in_rule, out_rule=out_rule)
 
         self.folder_path, self.player_options = load_app_config(CONFIG_FILE)
             
@@ -505,7 +508,7 @@ class DartsApp:
         self._setting_mode = True
         self.mode_var.set(mode)
         self._setting_mode = False
-        self.game = Game501(mode)
+        self.game = Game501(mode, starting_score=self.starting_score, in_rule=self.in_rule, out_rule=self.out_rule)
         self.mode = 4 if self.is_team_mode() else self.individual_mode_player_count()
 
         if preserve_names and existing_names:
@@ -545,8 +548,8 @@ class DartsApp:
         players = self.stats_players_in_display_order()
         score_history = {player.name: [] for player in players}
         current_turn_scores = {player.name: 0 for player in players}
-        team_score = {side: 501 for side in range(len(self.game.teams))}
-        team_turn_start = {side: 501 for side in range(len(self.game.teams))}
+        team_score = {side: self.starting_score for side in range(len(self.game.teams))}
+        team_turn_start = {side: self.starting_score for side in range(len(self.game.teams))}
         last_player = None
 
         for hit in self.dart_history:
@@ -865,8 +868,8 @@ class DartsApp:
         current_turn_player = None
         current_turn_side = None
         current_turn_hits = []
-        team_score = {side: 501 for side in sides}
-        team_turn_start = {side: 501 for side in sides}
+        team_score = {side: self.starting_score for side in sides}
+        team_turn_start = {side: self.starting_score for side in sides}
 
         def reset_pending(player_name, side):
             for field in player_pending[player_name]:
@@ -1065,10 +1068,10 @@ class DartsApp:
 
     def save(self):
         if self.is_individual_mode():
-            self.filename = f"501_{'_vs_'.join(player.name for player in self.game.players_by_turn_order())}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
+            self.filename = f"{self.starting_score}_{'_vs_'.join(player.name for player in self.game.players_by_turn_order())}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
             metadata = {"game_mode": self.mode_var.get()}
         else:
-            self.filename = f"501_{self.game.teams[0].name}_vs_{self.game.teams[1].name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
+            self.filename = f"{self.starting_score}_{self.game.teams[0].name}_vs_{self.game.teams[1].name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
             metadata = {
                 "game_mode": self.mode_var.get(),
                 "team_names": [self.game.teams[0].name, self.game.teams[1].name],
@@ -1577,7 +1580,7 @@ class DartsApp:
         score = self.game.score_for_player(self.game.active_player())
         darts_used = self.game.darts_in_turn
         darts_left = 3 if darts_used == 0 else 3 - darts_used
-        hits = get_recommended_hits(darts_left, score)
+        hits = get_recommended_hits(darts_left, score) if self.out_rule == "double" else []
 
         for hh, hit in enumerate(hits):
             c.create_rectangle(
@@ -1683,7 +1686,7 @@ class DartsApp:
         player_progression = self.stats_cache.get("player_progression", {})
         grouping_progression = self.stats_cache.get("grouping_progression", {})
         bull_accuracy_progression = self.stats_cache.get("bull_accuracy_progression", {})
-        plot_limits = self.stats_cache.get("plot_limits", {"max_x": 1, "min_y": 0, "max_y": 501})
+        plot_limits = self.stats_cache.get("plot_limits", {"max_x": 1, "min_y": 0, "max_y": self.starting_score})
         team_players_lookup = self.stats_cache.get("team_players", {0: [], 1: []})
         player_colors = self.stats_cache.get("player_colors", {})
         active_player = self.stats_cache.get("active_player", "")
@@ -1835,7 +1838,7 @@ class DartsApp:
         player_progression = self.stats_cache.get("player_progression", {})
         grouping_progression = self.stats_cache.get("grouping_progression", {})
         bull_accuracy_progression = self.stats_cache.get("bull_accuracy_progression", {})
-        plot_limits = self.stats_cache.get("plot_limits", {"max_x": 1, "min_y": 0, "max_y": 501})
+        plot_limits = self.stats_cache.get("plot_limits", {"max_x": 1, "min_y": 0, "max_y": self.starting_score})
         player_colors = self.stats_cache.get("player_colors", {})
         active_player = self.stats_cache.get("active_player", "")
         surface_text = self.contrast_text_color(c.cget("bg"))
