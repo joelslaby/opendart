@@ -3,7 +3,7 @@ import tkinter as tk
 from dart_engine.params_501 import Hit, Game501
 from datetime import datetime
 from math import hypot
-from tkinter import messagebox, simpledialog, ttk
+from tkinter import simpledialog, ttk
 
 from PIL import Image, ImageTk
 os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib-codex")
@@ -21,7 +21,6 @@ from dart_engine.ui_common import (
     choose_save_directory,
     infer_player_turn_order,
     load_app_config,
-    load_dart_history,
     load_saved_game,
     save_dart_history,
     show_save_confirmation,
@@ -58,23 +57,34 @@ TEXT_LIGHT = "#f5f1ea"
 
 class DartsApp:
 
-    def __init__(self, root, on_back=None, initial_mode="2v2"):
+    def __init__(self, root, on_back=None, initial_mode="2v2", starting_score=501, in_rule="any", out_rule="double"):
 
         self.root = root
         self.on_back = on_back
-        root.title("501 Darts")
+        self.starting_score = starting_score
+        self.in_rule = in_rule
+        self.out_rule = out_rule
+        root.title(f"{starting_score} Darts — {in_rule.title()} In / {out_rule.title()} Out")
         root.attributes('-fullscreen', True)
         x = root.winfo_width()
         y = root.winfo_height()
+        self.window_height = y
 
-        self.game = Game501()
+        # Controls below the board are stacked in 6 rows; space them to fill
+        # whatever vertical room this screen actually has instead of assuming
+        # one fixed resolution (MacBook Air vs. MacBook Pro differ by ~30px).
+        content_top = 700
+        row_step = max(30, (y - content_top - 55) / 5)
+        self.row_y = [content_top + i * row_step for i in range(6)]
+
+        self.game = Game501(starting_score=starting_score, in_rule=in_rule, out_rule=out_rule)
 
         self.folder_path, self.player_options = load_app_config(CONFIG_FILE)
             
         # Set the StringVar so Entry shows it
         self.folder_path_var = tk.StringVar(value=self.folder_path if self.folder_path is not None else "Save directory not set")
 
-        img = Image.open("dartboard_images/dartboard_accurate.png")
+        img = Image.open("assets/dartboard_images/dartboard_accurate.png")
         self.size = 600
         img = img.resize((self.size, self.size))
 
@@ -137,7 +147,7 @@ class DartsApp:
         self.stats_view_var.trace_add("write", self.handle_stats_view_change)
 
         btn_frame1 = tk.Frame(root)
-        btn_frame1.place(x=5, y=700)
+        btn_frame1.place(x=5, y=self.row_y[0])
 
         if self.on_back:
             tk.Button(btn_frame1,text="Menu",font=("Arial",24),command=self.on_back, padx=0).pack(side=tk.LEFT)
@@ -146,13 +156,13 @@ class DartsApp:
         tk.Button(btn_frame1,text="New Game",font=("Arial",24),command=self.reset, padx=0).pack(side=tk.LEFT)
 
         btn_frame2 = tk.Frame(root)
-        btn_frame2.place(x=5, y=740)
+        btn_frame2.place(x=5, y=self.row_y[1])
         tk.Button(btn_frame2,text="Save",font=("Arial",24),command=self.save).pack(side=tk.LEFT)
         tk.Button(btn_frame2,text="Save Setup...",font=("Arial",24),command=self.save_setup).pack(side=tk.LEFT)
         tk.Button(btn_frame2,text="Save As...",font=("Arial",24),command=self.save_as).pack(side=tk.RIGHT)
 
         btn_frame3 = tk.Frame(root)
-        btn_frame3.place(x=50, y=785)
+        btn_frame3.place(x=50, y=self.row_y[2])
         tk.Entry(
             btn_frame3,
             textvariable=self.folder_path_var,
@@ -168,7 +178,7 @@ class DartsApp:
         self.team2_name_var = tk.StringVar(value=self.game.teams[1].name)
 
         btn_frame4 = tk.Frame(root)
-        btn_frame4.place(x=0, y=815)
+        btn_frame4.place(x=0, y=self.row_y[3])
 
         self.team1_name_button = tk.Button(
             btn_frame4,
@@ -202,7 +212,7 @@ class DartsApp:
         self.swap_team_1_button.pack(side=tk.LEFT)
 
         btn_frame5 = tk.Frame(root)
-        btn_frame5.place(x=0, y=850)
+        btn_frame5.place(x=0, y=self.row_y[4])
         self.team2_name_button = tk.Button(
             btn_frame5,
             textvariable=self.team2_name_var,
@@ -235,7 +245,7 @@ class DartsApp:
         self.swap_team_2_button.pack(side=tk.LEFT)
 
         btn_frame6 = tk.Frame(root)
-        btn_frame6.place(x=0, y=890)
+        btn_frame6.place(x=0, y=self.row_y[5])
         tk.Button(btn_frame6,text="Swap teams",font=("Arial",20),command=self.swap_teams).pack(side=tk.LEFT)
         tk.Button(btn_frame6,text="Add Player",font=("Arial",20),command=self.add_player).pack(side=tk.LEFT)
         self.mode_var = tk.StringVar(value="2v2")
@@ -505,7 +515,7 @@ class DartsApp:
         self._setting_mode = True
         self.mode_var.set(mode)
         self._setting_mode = False
-        self.game = Game501(mode)
+        self.game = Game501(mode, starting_score=self.starting_score, in_rule=self.in_rule, out_rule=self.out_rule)
         self.mode = 4 if self.is_team_mode() else self.individual_mode_player_count()
 
         if preserve_names and existing_names:
@@ -517,12 +527,22 @@ class DartsApp:
                     self.team1_name_var.set(existing_team_names[0])
                     self.team2_name_var.set(existing_team_names[1])
             self.apply_player_vars_to_game()
+        else:
+            self.seed_default_players()
 
         self.sync_player_vars_from_game()
         self.update_mode_controls()
         self.clear_all_darts()
         self.refresh_caches()
         self.update_label()
+
+    def seed_default_players(self):
+        names = self.player_options
+        if not names:
+            return
+        for index, var in enumerate(self.player_slot_vars()):
+            var.set(names[index % len(names)])
+        self.apply_player_vars_to_game()
 
     def handle_mode_change(self, *_):
         if self.game is None or getattr(self, "_setting_mode", False):
@@ -545,8 +565,8 @@ class DartsApp:
         players = self.stats_players_in_display_order()
         score_history = {player.name: [] for player in players}
         current_turn_scores = {player.name: 0 for player in players}
-        team_score = {side: 501 for side in range(len(self.game.teams))}
-        team_turn_start = {side: 501 for side in range(len(self.game.teams))}
+        team_score = {side: self.starting_score for side in range(len(self.game.teams))}
+        team_turn_start = {side: self.starting_score for side in range(len(self.game.teams))}
         last_player = None
 
         for hit in self.dart_history:
@@ -863,10 +883,9 @@ class DartsApp:
             for side in sides
         }
         current_turn_player = None
-        current_turn_side = None
         current_turn_hits = []
-        team_score = {side: 501 for side in sides}
-        team_turn_start = {side: 501 for side in sides}
+        team_score = {side: self.starting_score for side in sides}
+        team_turn_start = {side: self.starting_score for side in sides}
 
         def reset_pending(player_name, side):
             for field in player_pending[player_name]:
@@ -893,7 +912,6 @@ class DartsApp:
 
             if player_name != current_turn_player:
                 current_turn_player = player_name
-                current_turn_side = side
                 current_turn_hits = []
                 team_turn_start[side] = team_score[side]
                 reset_pending(player_name, side)
@@ -934,7 +952,6 @@ class DartsApp:
                     reset_pending(player_name, side)
                     sync_display(player_name, side)
                 current_turn_player = None
-                current_turn_side = None
                 current_turn_hits = []
             else:
                 if player_name in player_stats and (len(current_turn_hits) == 3 or winning_checkout):
@@ -949,7 +966,6 @@ class DartsApp:
                             (grouping_turn_index[player_name], self.turn_bull_accuracy(current_turn_hits))
                         )
                     current_turn_player = None
-                    current_turn_side = None
                     current_turn_hits = []
 
             distribution_points[side].append(
@@ -1065,10 +1081,10 @@ class DartsApp:
 
     def save(self):
         if self.is_individual_mode():
-            self.filename = f"501_{'_vs_'.join(player.name for player in self.game.players_by_turn_order())}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
+            self.filename = f"{self.starting_score}_{'_vs_'.join(player.name for player in self.game.players_by_turn_order())}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
             metadata = {"game_mode": self.mode_var.get()}
         else:
-            self.filename = f"501_{self.game.teams[0].name}_vs_{self.game.teams[1].name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
+            self.filename = f"{self.starting_score}_{self.game.teams[0].name}_vs_{self.game.teams[1].name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
             metadata = {
                 "game_mode": self.mode_var.get(),
                 "team_names": [self.game.teams[0].name, self.game.teams[1].name],
@@ -1238,7 +1254,7 @@ class DartsApp:
         c = self.score_canvas
         c.delete("all")
 
-        size_x = 454
+        size_x = max(int(c.winfo_width()), int(float(c["width"])))
         size_y = 600
         row_height = 68
         start_y = 90
@@ -1284,7 +1300,7 @@ class DartsApp:
         c = self.score_canvas
         c.delete("all")
 
-        size_x = 454
+        size_x = max(int(c.winfo_width()), int(float(c["width"])))
         size_y = 600
         row_height = 68
         start_y = 90
@@ -1374,12 +1390,11 @@ class DartsApp:
     def infoboard_layout(self):
         width = 600
         panel_width = int(width / 3)
-        if self.screen_width == 1470:
-            panel_height = 162
-            pfp_size = 98
-        else:
-            panel_height = 174
-            pfp_size = 100
+        # info_canvas is 2 stacked panels tall; size them to whatever room
+        # this screen's height actually leaves below the board (was
+        # hardcoded for one exact MacBook Air width before).
+        panel_height = max(140, int((self.window_height - 604) / 2))
+        pfp_size = max(80, int(panel_height * 100 / 174))
         return width, panel_width, panel_height, pfp_size, 40
 
     def draw_infoboard_teams(self):
@@ -1569,7 +1584,7 @@ class DartsApp:
         c = self.rec_canvas
         c.delete("all")
 
-        size_x = 454
+        size_x = max(int(c.winfo_width()), int(float(c["width"])))
         size_y = 98
         rec_size_x = 100
         rec_size_y = 60
@@ -1577,7 +1592,7 @@ class DartsApp:
         score = self.game.score_for_player(self.game.active_player())
         darts_used = self.game.darts_in_turn
         darts_left = 3 if darts_used == 0 else 3 - darts_used
-        hits = get_recommended_hits(darts_left, score)
+        hits = get_recommended_hits(darts_left, score) if self.out_rule == "double" else []
 
         for hh, hit in enumerate(hits):
             c.create_rectangle(
@@ -1623,7 +1638,7 @@ class DartsApp:
 
         zoom_factor = 3
         line_size = 50
-        canvas_size = 460
+        canvas_size = max(int(c.winfo_width()), int(float(c["width"])))
         img = self.zoom_source_img.copy()
         img = img.crop((int(x-300/zoom_factor),int(y-300/zoom_factor),int(x+300/zoom_factor),int(y+300/zoom_factor)))
         img = img.resize((canvas_size,canvas_size), Image.Resampling.LANCZOS)
@@ -1683,7 +1698,7 @@ class DartsApp:
         player_progression = self.stats_cache.get("player_progression", {})
         grouping_progression = self.stats_cache.get("grouping_progression", {})
         bull_accuracy_progression = self.stats_cache.get("bull_accuracy_progression", {})
-        plot_limits = self.stats_cache.get("plot_limits", {"max_x": 1, "min_y": 0, "max_y": 501})
+        plot_limits = self.stats_cache.get("plot_limits", {"max_x": 1, "min_y": 0, "max_y": self.starting_score})
         team_players_lookup = self.stats_cache.get("team_players", {0: [], 1: []})
         player_colors = self.stats_cache.get("player_colors", {})
         active_player = self.stats_cache.get("active_player", "")
@@ -1696,6 +1711,10 @@ class DartsApp:
         col_width = max(1, (width - outer_pad * 2 - gutter) / 2)
         col_lefts = [outer_pad, outer_pad + col_width + gutter]
         title_y = 10
+        # Inline stat rows are sized for a ~210px-wide card; narrower cards
+        # (smaller screens) shrink the stat font so the row keeps fitting
+        # instead of overflowing off the card.
+        stat_scale = max(0.6, min(1.0, col_width / 210))
 
         c.create_text(width / 2, title_y, anchor="n", text="Live Stats", font=("Arial", 19, "bold"), fill=surface_text)
 
@@ -1730,9 +1749,10 @@ class DartsApp:
                     ("D", team["doubles"]),
                     ("T", team["triples"]),
                 ],
-                ("Arial", 10, "bold"),
-                ("Arial", 10),
+                ("Arial", max(7, round(10 * stat_scale)), "bold"),
+                ("Arial", max(7, round(10 * stat_scale))),
                 color=team_text,
+                gap=round(10 * stat_scale),
             )
 
             y = top_y + team_box_height + 3
@@ -1756,9 +1776,10 @@ class DartsApp:
                         ("D", player["doubles"]),
                         ("T", player["triples"]),
                     ],
-                    ("Arial", 9, "bold"),
-                    ("Arial", 9),
+                    ("Arial", max(7, round(9 * stat_scale)), "bold"),
+                    ("Arial", max(7, round(9 * stat_scale))),
                     color=player_text,
+                    gap=round(10 * stat_scale),
                 )
                 self.draw_inline_stats(
                     c,
@@ -1771,9 +1792,10 @@ class DartsApp:
                         ("75+", player["score_75_plus"]),
                         ("100+", player["score_100_plus"]),
                     ],
-                    ("Arial", 9, "bold"),
-                    ("Arial", 9),
+                    ("Arial", max(7, round(9 * stat_scale)), "bold"),
+                    ("Arial", max(7, round(9 * stat_scale))),
                     color=player_text,
+                    gap=round(10 * stat_scale),
                 )
                 y += player_box_height + player_gap
 
@@ -1835,7 +1857,7 @@ class DartsApp:
         player_progression = self.stats_cache.get("player_progression", {})
         grouping_progression = self.stats_cache.get("grouping_progression", {})
         bull_accuracy_progression = self.stats_cache.get("bull_accuracy_progression", {})
-        plot_limits = self.stats_cache.get("plot_limits", {"max_x": 1, "min_y": 0, "max_y": 501})
+        plot_limits = self.stats_cache.get("plot_limits", {"max_x": 1, "min_y": 0, "max_y": self.starting_score})
         player_colors = self.stats_cache.get("player_colors", {})
         active_player = self.stats_cache.get("active_player", "")
         surface_text = self.contrast_text_color(c.cget("bg"))
@@ -1847,6 +1869,7 @@ class DartsApp:
         col_width = max(1, (width - outer_pad * 2 - gutter) / 2)
         col_lefts = [outer_pad, outer_pad + col_width + gutter]
         title_y = 10
+        stat_scale = max(0.6, min(1.0, col_width / 210))
         c.create_text(width / 2, title_y, anchor="n", text="Live Stats", font=("Arial", 19, "bold"), fill=surface_text)
 
         split_index = (len(players) + 1) // 2
@@ -1886,9 +1909,10 @@ class DartsApp:
                         ("D", player["doubles"]),
                         ("T", player["triples"]),
                     ],
-                    ("Arial", 9, "bold"),
-                    ("Arial", 9),
+                    ("Arial", max(7, round(9 * stat_scale)), "bold"),
+                    ("Arial", max(7, round(9 * stat_scale))),
                     color=player_text,
+                    gap=round(10 * stat_scale),
                 )
                 self.draw_inline_stats(
                     c,
@@ -1901,9 +1925,10 @@ class DartsApp:
                         ("75+", player["score_75_plus"]),
                         ("100+", player["score_100_plus"]),
                     ],
-                    ("Arial", 9, "bold"),
-                    ("Arial", 9),
+                    ("Arial", max(7, round(9 * stat_scale)), "bold"),
+                    ("Arial", max(7, round(9 * stat_scale))),
                     color=player_text,
+                    gap=round(10 * stat_scale),
                 )
                 y += player_box_height + player_gap
 

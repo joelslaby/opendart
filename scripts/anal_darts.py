@@ -3,7 +3,6 @@ from dart_engine.params_cricket import Team
 from dart_engine.helpers_cricket import get_game_marks_sum
 from dart_engine.helpers_501 import get_recommended_hits
 from matplotlib import pyplot as plt
-import csv
 
 CRICKET_NUMBERS = [20,19,18,17,16,15,25]
 

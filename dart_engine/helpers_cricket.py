@@ -1,7 +1,5 @@
 from dart_engine.cricket_stats import (
-    CRICKET_NUMBERS,
     build_cricket_marks_by_turn,
-    cricket_marks,
 )
 
 

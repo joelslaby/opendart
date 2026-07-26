@@ -1,6 +1,5 @@
 import json
 import pandas as pd
-from collections import defaultdict
 import copy
 import matplotlib.pyplot as plt
 from PIL import Image
