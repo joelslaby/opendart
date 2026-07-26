@@ -3,7 +3,7 @@ import tkinter as tk
 from dart_engine.params_501 import Hit, Game501
 from datetime import datetime
 from math import hypot
-from tkinter import messagebox, simpledialog, ttk
+from tkinter import simpledialog, ttk
 
 from PIL import Image, ImageTk
 os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib-codex")
@@ -21,7 +21,6 @@ from dart_engine.ui_common import (
     choose_save_directory,
     infer_player_turn_order,
     load_app_config,
-    load_dart_history,
     load_saved_game,
     save_dart_history,
     show_save_confirmation,
@@ -85,7 +84,7 @@ class DartsApp:
         # Set the StringVar so Entry shows it
         self.folder_path_var = tk.StringVar(value=self.folder_path if self.folder_path is not None else "Save directory not set")
 
-        img = Image.open("dartboard_images/dartboard_accurate.png")
+        img = Image.open("assets/dartboard_images/dartboard_accurate.png")
         self.size = 600
         img = img.resize((self.size, self.size))
 
@@ -884,7 +883,6 @@ class DartsApp:
             for side in sides
         }
         current_turn_player = None
-        current_turn_side = None
         current_turn_hits = []
         team_score = {side: self.starting_score for side in sides}
         team_turn_start = {side: self.starting_score for side in sides}
@@ -914,7 +912,6 @@ class DartsApp:
 
             if player_name != current_turn_player:
                 current_turn_player = player_name
-                current_turn_side = side
                 current_turn_hits = []
                 team_turn_start[side] = team_score[side]
                 reset_pending(player_name, side)
@@ -955,7 +952,6 @@ class DartsApp:
                     reset_pending(player_name, side)
                     sync_display(player_name, side)
                 current_turn_player = None
-                current_turn_side = None
                 current_turn_hits = []
             else:
                 if player_name in player_stats and (len(current_turn_hits) == 3 or winning_checkout):
@@ -970,7 +966,6 @@ class DartsApp:
                             (grouping_turn_index[player_name], self.turn_bull_accuracy(current_turn_hits))
                         )
                     current_turn_player = None
-                    current_turn_side = None
                     current_turn_hits = []
 
             distribution_points[side].append(

@@ -2,7 +2,7 @@
 # Double-click to launch OpenDart. Runs through Terminal so it inherits
 # Terminal's existing Full Disk Access — a standalone .app bundle hits
 # macOS's per-app TCC sandboxing and gets denied reading this folder.
-cd "$(dirname "${BASH_SOURCE[0]}")" || exit 1
+cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 1
 
 if [ -x "$HOME/miniconda3/envs/darts/bin/python" ]; then
     PYTHON="$HOME/miniconda3/envs/darts/bin/python"

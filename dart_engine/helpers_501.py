@@ -5,7 +5,7 @@ from functools import lru_cache
 @lru_cache(maxsize=1)
 def _load_checkout_chart() -> dict[int, list[str]]:
     chart = {}
-    with open("references/dart_out_chart.csv", newline="") as csvfile:
+    with open("assets/references/dart_out_chart.csv", newline="") as csvfile:
         reader = csv.reader(csvfile, delimiter=",")
         next(reader, None)
         for row in reader:

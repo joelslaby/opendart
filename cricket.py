@@ -2,7 +2,7 @@ import os
 import tkinter as tk
 from datetime import datetime
 from math import ceil, hypot
-from tkinter import messagebox, simpledialog, ttk
+from tkinter import simpledialog, ttk
 
 from PIL import Image, ImageTk
 os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib-codex")
@@ -10,11 +10,9 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 from matplotlib.ticker import AutoMinorLocator, LinearLocator
 
-from dart_engine.helpers_cricket import cricket_marks
-from dart_engine.cricket_stats import build_all_cricket_marks_by_turn
+from dart_engine.cricket_stats import build_all_cricket_marks_by_turn, cricket_marks
 from dart_engine.helpers_general import (
     classify_miss_zone,
-    get_screen_size_tkinter,
     interpret_click,
     swap_players_history,
     swap_teams_history,
@@ -33,7 +31,6 @@ from dart_engine.ui_common import (
     choose_save_directory,
     infer_player_turn_order,
     load_app_config,
-    load_dart_history,
     load_saved_game,
     replay_dart_history,
     save_dart_history,
@@ -87,7 +84,7 @@ class DartsApp:
             value=self.folder_path if self.folder_path is not None else "Save directory not set"
         )
 
-        img = Image.open("dartboard_images/dartboard_accurate.png")
+        img = Image.open("assets/dartboard_images/dartboard_accurate.png")
         self.size = 600
         img = img.resize((self.size, self.size))
         self.board_img = ImageTk.PhotoImage(img)

@@ -3,7 +3,7 @@
 # python directly from this bundle's own process — a fresh unsigned app
 # binary gets silently denied by macOS's per-app Documents-folder sandbox
 # (TCC), but Terminal already has that access, so we ride on it instead.
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 
 if [ -x "$HOME/miniconda3/envs/darts/bin/python" ]; then
     PYTHON="$HOME/miniconda3/envs/darts/bin/python"

@@ -2,7 +2,7 @@ import os
 
 
 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".gif", ".bmp")
-PROFILE_PIC_DIR = "profile_pics"
+PROFILE_PIC_DIR = "assets/profile_pics"
 
 
 def format_hit_label(number: int, multiplier: int) -> str:
